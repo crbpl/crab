@@ -1,1031 +1,2218 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>ORBIT — Personal CRM</title>
-
-<!--
-  ╔══════════════════════════════════════════════════════════════════╗
-  ║  ORBIT PERSONAL CRM — Supabase Edition                          ║
-  ║  GitHub → push this single file to your repo                    ║
-  ╠══════════════════════════════════════════════════════════════════╣
-  ║  SETUP: Replace the two config values below, then run the       ║
-  ║  SQL schema in your Supabase SQL Editor once.                   ║
-  ╠══════════════════════════════════════════════════════════════════╣
-  ║  SQL SCHEMA — run this once in Supabase SQL Editor:             ║
-  ║                                                                  ║
-  ║  create table people (                                           ║
-  ║    id          uuid primary key default gen_random_uuid(),       ║
-  ║    name        text not null,                                    ║
-  ║    company     text,                                             ║
-  ║    title       text,                                             ║
-  ║    email       text,                                             ║
-  ║    phone       text,                                             ║
-  ║    linkedin    text,                                             ║
-  ║    bucket      text default 'Acquaintances',                     ║
-  ║    tags        text[] default '{}',                              ║
-  ║    notes       text,                                             ║
-  ║    last_contact date,                                            ║
-  ║    created_at  timestamptz default now()                         ║
-  ║  );                                                              ║
-  ║                                                                  ║
-  ║  alter table people enable row level security;                   ║
-  ║                                                                  ║
-  ║  create policy "Public access"                                   ║
-  ║    on people for all using (true) with check (true);             ║
-  ╚══════════════════════════════════════════════════════════════════╝
--->
-
-<!-- ─── SUPABASE CONFIG ─── -->
-<script>
-  const SUPABASE_URL  = 'https://vpnfctgdfeklqhqloaor.supabase.co';
-  const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwbmZjdGdkZmVrbHFocWxvYW9yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Nzc3MDYsImV4cCI6MjA4ODA1MzcwNn0.NbvLAhB_2zOe_YoTLZ6WeADObjT3gyAsYn3ZFppTOec';
-</script>
-
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ORBIT — CRM v1.2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
 <style>
-  /* ─── RESET & BASE ─── */
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  :root {
-    --bg:       #0a0e1a;
-    --bg2:      #0d1120;
-    --bg3:      #111623;
-    --bg4:      #131928;
-    --border:   #1e2740;
-    --border2:  #2e3650;
-    --text:     #e2e8f0;
-    --text2:    #94a3b8;
-    --text3:    #64748b;
-    --text4:    #475569;
-    --text5:    #334155;
-    --blue:     #2563eb;
-    --red:      #f87171;
-    --font: 'DM Mono', 'IBM Plex Mono', 'Courier New', monospace;
-  }
-  html, body { height: 100%; overflow: hidden; }
-  body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 13px; }
-  input, select, textarea, button { font-family: var(--font); }
-  button { cursor: pointer; }
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-
-  /* ─── LAYOUT ─── */
-  #app { display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
-
-  /* ─── HEADER ─── */
-  #header {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 24px; background: var(--bg2); border-bottom: 1px solid var(--border);
-    flex-shrink: 0;
-  }
-  #header .logo { display: flex; align-items: center; gap: 12px; }
-  #header .logo-icon {
-    width: 30px; height: 30px; border-radius: 7px;
-    background: linear-gradient(135deg, #2563eb, #7c3aed);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 15px; color: #fff; flex-shrink: 0;
-  }
-  #header .logo-text { font-size: 14px; font-weight: 700; color: #f1f5f9; letter-spacing: -0.01em; }
-  #header .logo-sub { font-size: 9px; color: var(--text5); letter-spacing: 0.1em; text-transform: uppercase; }
-  #header .header-right { display: flex; align-items: center; gap: 10px; }
-  #total-count { font-size: 11px; color: var(--text4); }
-  #btn-add {
-    background: var(--blue); border: none; color: #fff; border-radius: 6px;
-    padding: 7px 14px; font-size: 11px; font-weight: 700; letter-spacing: 0.03em;
-    transition: opacity 0.15s;
-  }
-  #btn-add:hover { opacity: 0.85; }
-
-  /* ─── BUCKET TABS ─── */
-  #bucket-bar {
-    display: flex; gap: 0; overflow-x: auto; flex-shrink: 0;
-    background: var(--bg2); border-bottom: 1px solid var(--border);
-    padding: 0 24px;
-  }
-  #bucket-bar::-webkit-scrollbar { height: 3px; }
-  .bucket-tab {
-    background: none; border: none; border-bottom: 2px solid transparent;
-    color: var(--text4); padding: 11px 13px; font-size: 11px; font-weight: 600;
-    letter-spacing: 0.02em; white-space: nowrap; transition: color 0.15s;
-    display: flex; align-items: center; gap: 5px;
-  }
-  .bucket-tab .tab-count { font-size: 10px; opacity: 0.6; }
-  .bucket-tab:hover { color: var(--text2); }
-  .bucket-tab.active { font-weight: 700; }
-
-  /* ─── TOOLBAR ─── */
-  #toolbar {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 24px; border-bottom: 1px solid #151c2e; flex-shrink: 0;
-  }
-  #search-wrap { position: relative; flex: 1; max-width: 340px; }
-  #search-wrap .search-icon {
-    position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
-    color: var(--text5); font-size: 14px; pointer-events: none;
-  }
-  #search-input {
-    width: 100%; background: var(--bg3); border: 1px solid var(--border);
-    border-radius: 6px; padding: 7px 10px 7px 30px; color: var(--text);
-    font-size: 12px; outline: none;
-  }
-  #search-input:focus { border-color: var(--border2); }
-  #search-input::placeholder { color: var(--text5); }
-  .view-toggle {
-    display: flex; background: var(--bg3); border: 1px solid var(--border);
-    border-radius: 6px; overflow: hidden;
-  }
-  .view-btn {
-    background: none; border: none; color: var(--text4);
-    padding: 7px 13px; font-size: 11px; font-weight: 600;
-    transition: background 0.1s, color 0.1s;
-  }
-  .view-btn.active { background: var(--border); color: var(--text); }
-  #sort-select {
-    background: var(--bg3); border: 1px solid var(--border); color: var(--text2);
-    border-radius: 6px; padding: 7px 10px; font-size: 11px; outline: none;
-    font-family: var(--font);
-  }
-  #contact-count { font-size: 11px; color: var(--text5); margin-left: auto; }
-
-  /* ─── MAIN AREA ─── */
-  #main { display: flex; flex: 1; overflow: hidden; min-height: 0; }
-  #contact-area { flex: 1; overflow-y: auto; }
-
-  /* ─── LIST VIEW ─── */
-  #list-view { width: 100%; border-collapse: collapse; }
-  #list-view thead th {
-    padding: 9px 14px; text-align: left; font-size: 10px; font-weight: 700;
-    color: var(--text4); letter-spacing: 0.07em; text-transform: uppercase;
-    border-bottom: 1px solid var(--border); background: var(--bg2);
-    white-space: nowrap; user-select: none; cursor: pointer; position: sticky; top: 0; z-index: 5;
-  }
-  #list-view thead th:hover { color: var(--text2); }
-  #list-view thead th.sort-active { color: #60a5fa; }
-  #list-view tbody tr {
-    border-left: 2px solid transparent;
-    transition: background 0.1s; cursor: pointer;
-  }
-  #list-view tbody tr:hover { background: #0f1420; }
-  #list-view tbody tr.selected { background: var(--bg4); border-left-color: var(--blue); }
-  #list-view tbody td {
-    padding: 9px 14px; border-bottom: 1px solid #111623;
-    vertical-align: middle;
-  }
-  .contact-name-cell { display: flex; align-items: center; gap: 9px; }
-  .contact-name { font-size: 13px; font-weight: 600; color: #f1f5f9; }
-  .contact-title-small { font-size: 10px; color: var(--text4); }
-  .stale-red { color: var(--red) !important; }
-
-  /* ─── CARDS VIEW ─── */
-  #cards-view {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
-    gap: 12px; padding: 18px 24px;
-  }
-  .card {
-    background: #0f1520; border: 1px solid var(--border);
-    border-radius: 8px; padding: 15px; cursor: pointer;
-    transition: border-color 0.15s; position: relative;
-    border-top-width: 2px;
-  }
-  .card:hover { border-color: var(--border2); }
-  .card.selected { background: var(--bg4); border-color: var(--blue); border-top-color: var(--blue) !important; }
-  .card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
-  .card-info .card-name { font-size: 13px; font-weight: 700; color: #f1f5f9; }
-  .card-info .card-sub { font-size: 10px; color: var(--text4); margin-top: 1px; }
-  .card-company { font-size: 11px; color: var(--text5); margin-bottom: 6px; }
-  .card-email { font-size: 10px; color: var(--text5); margin-bottom: 8px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .card-footer { display: flex; align-items: center; justify-content: space-between; }
-  .card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
-  .card-tag { background: #1a2035; color: var(--text4); border-radius: 3px; padding: 1px 6px; font-size: 10px; }
-  .edit-btn-small {
-    background: none; border: none; color: var(--text5);
-    font-size: 13px; padding: 2px 5px; transition: color 0.1s;
-  }
-  .edit-btn-small:hover { color: var(--text2); }
-
-  /* ─── AVATAR ─── */
-  .avatar {
-    border-radius: 50%; display: flex; align-items: center; justify-content: center;
-    font-weight: 700; flex-shrink: 0; letter-spacing: -0.02em;
-  }
-
-  /* ─── BUCKET PILL ─── */
-  .bucket-pill {
-    border-radius: 4px; padding: 2px 7px; font-size: 10px;
-    font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
-    white-space: nowrap; border: 1px solid;
-  }
-
-  /* ─── DETAIL PANE ─── */
-  #detail-pane {
-    width: 310px; flex-shrink: 0; overflow-y: auto;
-    border-left: 1px solid var(--border); padding: 20px;
-    display: none;
-  }
-  #detail-pane.open { display: block; }
-  .dp-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; }
-  .dp-name { font-size: 16px; font-weight: 700; color: #f1f5f9; }
-  .dp-sub { font-size: 11px; color: var(--text3); margin-top: 2px; }
-  .dp-close { background: none; border: none; color: var(--text4); font-size: 17px; }
-  .dp-close:hover { color: var(--text2); }
-  .stale-box {
-    padding: 9px 12px; border-radius: 6px; margin: 10px 0 14px;
-    font-size: 11px; border: 1px solid;
-  }
-  .stale-box .stale-label { font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
-  .dp-row { display: flex; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--border); }
-  .dp-row-label { font-size: 10px; font-weight: 700; color: var(--text4); letter-spacing: 0.07em; text-transform: uppercase; width: 80px; flex-shrink: 0; padding-top: 1px; }
-  .dp-row-val { font-size: 12px; color: #cbd5e1; word-break: break-word; }
-  .dp-tags { display: flex; flex-wrap: wrap; gap: 4px; }
-  .dp-tag { background: var(--border); color: var(--text2); border-radius: 3px; padding: 2px 7px; font-size: 11px; }
-  #dp-edit-btn {
-    margin-top: 16px; width: 100%; background: var(--border); border: 1px solid var(--border2);
-    color: var(--text2); border-radius: 6px; padding: 9px; font-size: 12px; font-weight: 600;
-    transition: background 0.1s;
-  }
-  #dp-edit-btn:hover { background: var(--border2); color: var(--text); }
-
-  /* ─── MODAL ─── */
-  #modal-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.72); z-index: 200;
-    display: none; align-items: center; justify-content: center; padding: 20px;
-  }
-  #modal-overlay.open { display: flex; }
-  #modal {
-    background: var(--bg3); border: 1px solid var(--border); border-radius: 12px;
-    width: 100%; max-width: 540px; max-height: 92vh; overflow-y: auto; padding: 26px;
-  }
-  .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 22px; }
-  .modal-title-wrap { display: flex; align-items: center; gap: 12px; }
-  .modal-title { font-size: 15px; font-weight: 700; color: #f1f5f9; }
-  .modal-sub { font-size: 11px; color: var(--text4); }
-  .modal-close { background: none; border: none; color: var(--text4); font-size: 19px; }
-  .modal-close:hover { color: var(--text2); }
-  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
-  .form-group { display: flex; flex-direction: column; gap: 5px; }
-  .form-group.full { grid-column: 1 / -1; }
-  .form-label { font-size: 10px; font-weight: 700; color: var(--text4); letter-spacing: 0.07em; text-transform: uppercase; }
-  .form-input, .form-select, .form-textarea {
-    background: var(--bg2); border: 1px solid var(--border); border-radius: 6px;
-    color: var(--text); padding: 8px 11px; font-size: 12px; outline: none;
-    font-family: var(--font); transition: border-color 0.15s;
-  }
-  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--border2); }
-  .form-input::placeholder { color: var(--text5); }
-  .form-textarea { resize: vertical; min-height: 76px; }
-  .tag-input-wrap {
-    background: var(--bg2); border: 1px solid var(--border); border-radius: 6px;
-    padding: 6px 10px; display: flex; flex-wrap: wrap; gap: 5px; min-height: 38px;
-    align-items: center;
-  }
-  .tag-pill {
-    background: var(--border); color: var(--text2); border-radius: 4px;
-    padding: 2px 7px; font-size: 11px; display: flex; align-items: center; gap: 4px;
-  }
-  .tag-remove { background: none; border: none; color: var(--text4); font-size: 13px; padding: 0; line-height: 1; }
-  .tag-remove:hover { color: var(--red); }
-  #tag-input-field {
-    background: none; border: none; outline: none; color: var(--text); font-size: 11px;
-    font-family: var(--font); min-width: 90px; flex: 1;
-  }
-  #tag-input-field::placeholder { color: var(--text5); }
-  .modal-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 22px; }
-  .modal-footer-right { display: flex; gap: 8px; }
-  #btn-delete {
-    background: #7f1d1d28; border: 1px solid #7f1d1d60; color: var(--red);
-    border-radius: 6px; padding: 8px 14px; font-size: 11px; font-weight: 600;
-    display: none;
-  }
-  #btn-delete:hover { background: #7f1d1d40; }
-  #btn-cancel {
-    background: none; border: 1px solid var(--border); color: var(--text2);
-    border-radius: 6px; padding: 8px 14px; font-size: 11px;
-  }
-  #btn-save {
-    background: var(--blue); border: none; color: #fff;
-    border-radius: 6px; padding: 8px 16px; font-size: 11px; font-weight: 700;
-  }
-  #btn-save:hover { opacity: 0.88; }
-
-  /* ─── EMPTY STATE ─── */
-  #empty-state {
-    display: none; flex-direction: column; align-items: center;
-    justify-content: center; padding: 70px 20px; color: var(--text5);
-  }
-  #empty-state.show { display: flex; }
-  .empty-icon { font-size: 36px; margin-bottom: 12px; }
-  .empty-text { font-size: 13px; }
-
-  /* ─── LOADING / TOAST ─── */
-  #loader {
-    position: fixed; top: 14px; right: 24px; background: var(--border);
-    border: 1px solid var(--border2); color: var(--text2); border-radius: 6px;
-    padding: 8px 14px; font-size: 11px; z-index: 300; display: none;
-    align-items: center; gap: 7px;
-  }
-  #loader.show { display: flex; }
-  .loader-spin {
-    width: 12px; height: 12px; border: 2px solid var(--border2);
-    border-top-color: var(--blue); border-radius: 50%; animation: spin 0.7s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  #toast {
-    position: fixed; bottom: 20px; right: 24px; background: #1a2740;
-    border: 1px solid var(--border2); color: var(--text); border-radius: 7px;
-    padding: 10px 16px; font-size: 12px; z-index: 300;
-    transform: translateY(20px); opacity: 0; transition: all 0.25s;
-    pointer-events: none;
-  }
-  #toast.show { transform: translateY(0); opacity: 1; }
-  #error-banner {
-    background: #450a0a; border-bottom: 1px solid #7f1d1d; color: #fca5a5;
-    padding: 10px 24px; font-size: 12px; text-align: center; display: none;
-  }
-  #error-banner.show { display: block; }
+/* ── VARIABLES ───────────────────────────────── */
+:root {
+  --bg:    #000;
+  --s1:    #080808;
+  --s2:    #101010;
+  --s3:    #181818;
+  --s4:    #202020;
+  --s5:    #2a2a2a;
+  --b1:    #1e1e1e;
+  --b2:    #2a2a2a;
+  --txt:   #ffffff;
+  --t2:    #aaaaaa;
+  --t3:    #666666;
+  --t4:    #444444;
+  --blue:  #3b82f6;
+  --blue2: #1d4ed8;
+  --green: #22c55e;
+  --amber: #f59e0b;
+  --red:   #ef4444;
+  --purp:  #a855f7;
+  --teal:  #14b8a6;
+  --font:  'Plus Jakarta Sans', sans-serif;
+  --sb:    220px;
+  --bb:    58px;
+  --rad:   10px;
+}
+/* ── RESET ───────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden;background:var(--bg)}
+body{font-family:var(--font);color:var(--txt);font-size:14px;line-height:1.5}
+input,select,textarea,button{font-family:var(--font)}
+button{cursor:pointer}
+a{color:var(--blue);text-decoration:none}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--b1);border-radius:3px}
+/* ── AUTH SCREEN ─────────────────────────────── */
+#auth-screen{
+  position:fixed;inset:0;background:var(--bg);
+  display:flex;align-items:center;justify-content:center;z-index:1000;
+}
+.auth-box{
+  width:100%;max-width:400px;padding:20px;
+}
+.auth-logo{
+  display:flex;align-items:center;gap:12px;margin-bottom:40px;
+}
+.auth-logo-icon{
+  width:40px;height:40px;border-radius:10px;
+  background:linear-gradient(135deg,var(--blue),var(--purp));
+  display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:900;color:#fff;
+}
+.auth-logo-name{font-size:22px;font-weight:900;letter-spacing:-.03em}
+.auth-logo-ver{font-size:11px;color:var(--t3);letter-spacing:.08em;text-transform:uppercase}
+.auth-title{font-size:26px;font-weight:800;margin-bottom:6px;letter-spacing:-.02em}
+.auth-sub{font-size:13px;color:var(--t2);margin-bottom:32px}
+.auth-field{margin-bottom:14px}
+.auth-label{display:block;font-size:11px;font-weight:700;color:var(--t3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:6px}
+.auth-input{
+  width:100%;background:var(--s2);border:1px solid var(--b1);border-radius:8px;
+  padding:12px 14px;color:var(--txt);font-size:14px;outline:none;
+  transition:border-color .15s;
+}
+.auth-input:focus{border-color:var(--blue)}
+.auth-input::placeholder{color:var(--t4)}
+.auth-btn{
+  width:100%;background:var(--blue);border:none;color:#fff;border-radius:8px;
+  padding:13px;font-size:15px;font-weight:700;margin-top:6px;
+  transition:opacity .15s;
+}
+.auth-btn:hover{opacity:.88}
+.auth-toggle{
+  text-align:center;margin-top:20px;font-size:13px;color:var(--t3);
+}
+.auth-toggle span{color:var(--blue);cursor:pointer;font-weight:600}
+.auth-toggle span:hover{text-decoration:underline}
+.auth-error{
+  background:#1a0505;border:1px solid #7f1d1d;border-radius:8px;
+  padding:11px 14px;font-size:13px;color:#fca5a5;margin-bottom:14px;display:none;
+}
+.auth-note{
+  background:var(--s2);border:1px solid var(--b1);border-radius:8px;
+  padding:11px 14px;font-size:12px;color:var(--t3);margin-top:20px;line-height:1.6;
+}
+/* ── APP SHELL ───────────────────────────────── */
+#app{display:none;height:100vh;overflow:hidden}
+/* ── SIDEBAR ─────────────────────────────────── */
+#sidebar{
+  position:fixed;left:0;top:0;bottom:0;width:var(--sb);
+  background:var(--s1);border-right:1px solid var(--b1);
+  display:flex;flex-direction:column;z-index:200;
+  transition:transform .25s ease;
+}
+#sidebar-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:199;
+  display:none;
+}
+.sb-logo{
+  padding:20px 18px 16px;display:flex;align-items:center;gap:10px;
+  border-bottom:1px solid var(--b1);
+}
+.sb-logo-icon{
+  width:32px;height:32px;border-radius:8px;
+  background:linear-gradient(135deg,var(--blue),var(--purp));
+  display:flex;align-items:center;justify-content:center;
+  font-size:16px;font-weight:900;color:#fff;flex-shrink:0;
+}
+.sb-logo-text{font-size:16px;font-weight:900;letter-spacing:-.03em}
+.sb-logo-ver{font-size:9px;color:var(--t4);letter-spacing:.1em;text-transform:uppercase}
+.sb-nav{flex:1;padding:12px 10px;overflow-y:auto}
+.sb-section{font-size:9px;font-weight:700;color:var(--t4);letter-spacing:.1em;text-transform:uppercase;padding:10px 8px 6px}
+.nav-item{
+  display:flex;align-items:center;gap:11px;padding:10px 10px;border-radius:8px;
+  color:var(--t2);font-size:13px;font-weight:600;cursor:pointer;
+  transition:background .12s,color .12s;position:relative;
+  border:none;background:none;width:100%;text-align:left;
+}
+.nav-item:hover{background:var(--s3);color:var(--txt)}
+.nav-item.active{background:var(--s3);color:var(--txt)}
+.nav-item.active::before{
+  content:'';position:absolute;left:0;top:25%;bottom:25%;
+  width:3px;border-radius:2px;background:var(--blue);
+}
+.nav-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+.nav-badge{
+  margin-left:auto;background:var(--red);color:#fff;
+  border-radius:10px;padding:1px 7px;font-size:10px;font-weight:700;
+}
+.sb-footer{padding:12px 10px;border-top:1px solid var(--b1)}
+.sb-user{
+  display:flex;align-items:center;gap:10px;padding:10px;
+  border-radius:8px;cursor:pointer;
+}
+.sb-user:hover{background:var(--s3)}
+.sb-avatar{
+  width:30px;height:30px;border-radius:50%;
+  background:linear-gradient(135deg,var(--blue),var(--purp));
+  display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:800;color:#fff;flex-shrink:0;
+}
+.sb-user-email{font-size:11px;color:var(--t3);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sb-signout{font-size:11px;color:var(--t4);cursor:pointer}
+.sb-signout:hover{color:var(--red)}
+/* ── MAIN BODY ───────────────────────────────── */
+#app-body{
+  margin-left:var(--sb);height:100vh;
+  display:flex;flex-direction:column;overflow:hidden;
+  padding-bottom:var(--bb);
+}
+/* ── TOP BAR ─────────────────────────────────── */
+#top-bar{
+  display:flex;align-items:center;gap:12px;
+  padding:14px 24px;border-bottom:1px solid var(--b1);
+  background:var(--s1);flex-shrink:0;
+}
+#hamburger{
+  display:none;background:none;border:none;color:var(--t2);
+  font-size:20px;padding:2px 6px;
+}
+#top-search-wrap{position:relative;flex:1;max-width:380px}
+#top-search-wrap .si{
+  position:absolute;left:12px;top:50%;transform:translateY(-50%);
+  color:var(--t4);font-size:15px;pointer-events:none;
+}
+#top-search{
+  width:100%;background:var(--s3);border:1px solid var(--b1);border-radius:8px;
+  padding:9px 12px 9px 34px;color:var(--txt);font-size:13px;outline:none;
+}
+#top-search:focus{border-color:var(--blue)}
+#top-search::placeholder{color:var(--t4)}
+.top-actions{display:flex;align-items:center;gap:8px;margin-left:auto}
+.btn-icon{
+  background:var(--s3);border:1px solid var(--b1);color:var(--t2);
+  border-radius:8px;padding:9px 12px;font-size:13px;position:relative;
+}
+.btn-icon:hover{background:var(--b1);color:var(--txt)}
+.notif-dot{
+  position:absolute;top:6px;right:6px;width:8px;height:8px;
+  background:var(--red);border-radius:50%;border:2px solid var(--s1);
+  display:none;
+}
+.btn-primary{
+  background:var(--blue);border:none;color:#fff;border-radius:8px;
+  padding:9px 16px;font-size:13px;font-weight:700;
+  transition:opacity .15s;
+}
+.btn-primary:hover{opacity:.88}
+/* ── VIEWS ───────────────────────────────────── */
+#content{flex:1;overflow-y:auto;overflow-x:hidden}
+.view{display:none;height:100%}
+.view.active{display:block}
+/* ── DASHBOARD ───────────────────────────────── */
+.dash-wrap{padding:24px;max-width:1200px}
+.dash-greeting{font-size:26px;font-weight:900;letter-spacing:-.02em;margin-bottom:4px}
+.dash-sub{font-size:14px;color:var(--t3);margin-bottom:28px}
+.stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}
+.stat-card{
+  background:var(--s2);border:1px solid var(--b1);border-radius:var(--rad);
+  padding:18px 20px;
+}
+.stat-card .stat-label{font-size:11px;font-weight:700;color:var(--t3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:8px}
+.stat-card .stat-val{font-size:30px;font-weight:900;letter-spacing:-.03em}
+.stat-card .stat-hint{font-size:11px;color:var(--t3);margin-top:4px}
+.dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.dash-panel{background:var(--s2);border:1px solid var(--b1);border-radius:var(--rad);overflow:hidden}
+.dp-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-bottom:1px solid var(--b1);
+}
+.dp-head h3{font-size:13px;font-weight:800;letter-spacing:-.01em}
+.dp-head .dp-count{font-size:11px;color:var(--t3)}
+.dp-body{padding:0}
+.dp-empty{padding:20px;text-align:center;color:var(--t4);font-size:13px}
+.dp-row{
+  display:flex;align-items:center;gap:12px;padding:12px 18px;
+  border-bottom:1px solid var(--b1);cursor:pointer;
+  transition:background .1s;
+}
+.dp-row:last-child{border-bottom:none}
+.dp-row:hover{background:var(--s3)}
+.dp-row .dr-name{font-size:13px;font-weight:700;flex:1}
+.dp-row .dr-meta{font-size:11px;color:var(--t3)}
+.dp-row .dr-action{
+  font-size:11px;background:var(--s4);border:1px solid var(--b1);
+  color:var(--t2);border-radius:6px;padding:4px 10px;
+  border:none;cursor:pointer;
+}
+.dp-row .dr-action:hover{background:var(--blue);color:#fff}
+.overdue{color:var(--red)!important}
+/* ── BUCKET TABS ─────────────────────────────── */
+#bucket-bar{
+  display:flex;overflow-x:auto;flex-shrink:0;
+  background:var(--s1);border-bottom:1px solid var(--b1);padding:0 24px;
+}
+#bucket-bar::-webkit-scrollbar{height:3px}
+.btab{
+  background:none;border:none;border-bottom:2px solid transparent;
+  color:var(--t4);padding:11px 14px;font-size:12px;font-weight:600;
+  white-space:nowrap;transition:color .12s;display:flex;align-items:center;gap:5px;
+}
+.btab:hover{color:var(--t2)}
+.btab.active{font-weight:800}
+.btab .tc{font-size:10px;opacity:.6}
+/* ── PEOPLE TOOLBAR ──────────────────────────── */
+#people-toolbar{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 24px;border-bottom:1px solid var(--b1);flex-shrink:0;
+}
+.sort-sel{
+  background:var(--s3);border:1px solid var(--b1);color:var(--t2);
+  border-radius:7px;padding:7px 10px;font-size:11px;outline:none;font-family:var(--font);
+}
+.view-tog{
+  display:flex;background:var(--s3);border:1px solid var(--b1);
+  border-radius:7px;overflow:hidden;
+}
+.vtbtn{
+  background:none;border:none;color:var(--t4);
+  padding:7px 13px;font-size:11px;font-weight:700;transition:all .1s;
+}
+.vtbtn.active{background:var(--b1);color:var(--txt)}
+.pc-count{font-size:11px;color:var(--t4);margin-left:auto}
+/* ── LIST VIEW ───────────────────────────────── */
+#list-view{width:100%;border-collapse:collapse}
+#list-view thead th{
+  padding:9px 14px;text-align:left;font-size:10px;font-weight:800;
+  color:var(--t4);letter-spacing:.07em;text-transform:uppercase;
+  border-bottom:1px solid var(--b1);background:var(--s1);
+  position:sticky;top:0;z-index:5;cursor:pointer;user-select:none;white-space:nowrap;
+}
+#list-view thead th:hover{color:var(--t2)}
+#list-view thead th.sa{color:var(--blue)}
+#list-view tbody tr{border-left:2px solid transparent;cursor:pointer;transition:background .08s}
+#list-view tbody tr:hover{background:var(--s2)}
+#list-view tbody tr.sel{background:var(--s3);border-left-color:var(--blue)}
+#list-view tbody td{padding:10px 14px;border-bottom:1px solid #111;vertical-align:middle}
+.nc{display:flex;align-items:center;gap:10px}
+.n-name{font-size:13px;font-weight:700;color:var(--txt)}
+.n-title{font-size:10px;color:var(--t4)}
+/* ── CARDS VIEW ──────────────────────────────── */
+#cards-view{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;padding:20px 24px}
+.ccard{
+  background:var(--s2);border:1px solid var(--b1);border-radius:var(--rad);
+  padding:18px;cursor:pointer;transition:border-color .12s;
+  border-top-width:2px;position:relative;
+}
+.ccard:hover{border-color:var(--b2)}
+.ccard.sel{background:var(--s3);border-color:var(--blue);border-top-color:var(--blue)!important}
+.cc-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px}
+.cc-name{font-size:14px;font-weight:800;letter-spacing:-.01em}
+.cc-sub{font-size:11px;color:var(--t3);margin-top:2px}
+.cc-co{font-size:12px;color:var(--t4);margin-bottom:6px}
+.cc-email{font-size:11px;color:var(--t4);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:10px}
+.cc-footer{display:flex;align-items:center;justify-content:space-between}
+.cc-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+.cc-tag{background:var(--s4);color:var(--t3);border-radius:4px;padding:2px 7px;font-size:10px;font-weight:600}
+/* ── CONTACT DETAIL (full screen) ────────────── */
+#view-contact{background:var(--bg);overflow-y:auto}
+.cd-wrap{max-width:900px;margin:0 auto;padding:24px}
+.cd-back{
+  display:inline-flex;align-items:center;gap:7px;
+  color:var(--t3);font-size:13px;font-weight:600;cursor:pointer;
+  margin-bottom:20px;border:none;background:none;
+}
+.cd-back:hover{color:var(--txt)}
+.cd-hero{display:flex;align-items:flex-start;gap:20px;margin-bottom:28px}
+.cd-hero-info{flex:1}
+.cd-name{font-size:30px;font-weight:900;letter-spacing:-.03em;margin-bottom:6px}
+.cd-meta{font-size:14px;color:var(--t3);margin-bottom:12px}
+.cd-pills{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.cd-actions{display:flex;gap:8px;flex-wrap:wrap}
+.cd-btn{
+  background:var(--s3);border:1px solid var(--b1);color:var(--t2);
+  border-radius:8px;padding:9px 16px;font-size:12px;font-weight:700;
+  transition:all .12s;
+}
+.cd-btn:hover{background:var(--b1);color:var(--txt)}
+.cd-btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.cd-btn.primary:hover{opacity:.88}
+.cd-btn.danger{background:#1a0505;border-color:#7f1d1d;color:var(--red)}
+.cd-btn.danger:hover{background:#7f1d1d30}
+.cd-sections{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.cd-section{
+  background:var(--s2);border:1px solid var(--b1);border-radius:var(--rad);
+  padding:18px;
+}
+.cd-section.full{grid-column:1/-1}
+.cd-sec-title{
+  font-size:10px;font-weight:800;color:var(--t4);
+  letter-spacing:.09em;text-transform:uppercase;margin-bottom:14px;
+}
+.cd-field{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid var(--b1)}
+.cd-field:last-child{border-bottom:none}
+.cd-fl{font-size:10px;font-weight:700;color:var(--t4);letter-spacing:.06em;text-transform:uppercase;width:90px;flex-shrink:0;padding-top:1px}
+.cd-fv{font-size:13px;color:var(--t2);word-break:break-word}
+.notes-preview{
+  font-size:13px;color:var(--t2);white-space:pre-wrap;line-height:1.7;
+  max-height:120px;overflow:hidden;position:relative;
+}
+.notes-preview::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;
+  height:40px;background:linear-gradient(transparent,var(--s2));
+}
+.expand-notes-btn{
+  margin-top:10px;font-size:12px;color:var(--blue);background:none;border:none;
+  font-weight:600;cursor:pointer;
+}
+.rem-item{
+  display:flex;align-items:center;gap:10px;padding:10px 0;
+  border-bottom:1px solid var(--b1);
+}
+.rem-item:last-child{border-bottom:none}
+.rem-check{
+  width:18px;height:18px;border-radius:5px;border:2px solid var(--b2);
+  background:none;cursor:pointer;flex-shrink:0;appearance:none;
+  transition:all .12s;position:relative;
+}
+.rem-check:checked{background:var(--green);border-color:var(--green)}
+.rem-check:checked::after{
+  content:'✓';position:absolute;inset:0;display:flex;
+  align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:900;
+}
+.rem-title{font-size:13px;font-weight:600;flex:1}
+.rem-due{font-size:11px;color:var(--t3)}
+.rem-due.overdue{color:var(--red)}
+.doc-item{
+  display:flex;align-items:center;gap:10px;padding:10px 0;
+  border-bottom:1px solid var(--b1);
+}
+.doc-item:last-child{border-bottom:none}
+.doc-icon{font-size:18px;flex-shrink:0}
+.doc-name{font-size:13px;font-weight:600;flex:1}
+.doc-link{font-size:11px;color:var(--blue);cursor:pointer}
+.add-inline-btn{
+  font-size:12px;color:var(--blue);background:none;border:none;
+  font-weight:700;cursor:pointer;margin-top:10px;padding:0;
+}
+.add-inline-btn:hover{text-decoration:underline}
+/* ── NOTES FULL SCREEN ───────────────────────── */
+#view-notes{background:var(--bg)}
+.notes-full-wrap{display:flex;flex-direction:column;height:100%}
+.notes-full-header{
+  display:flex;align-items:center;gap:12px;
+  padding:16px 24px;border-bottom:1px solid var(--b1);
+  background:var(--s1);flex-shrink:0;
+}
+.notes-full-title{font-size:16px;font-weight:800;flex:1}
+#notes-save-btn{background:var(--green);border:none;color:#fff;border-radius:8px;padding:9px 18px;font-size:13px;font-weight:700}
+#notes-save-btn:hover{opacity:.88}
+#notes-textarea{
+  flex:1;background:var(--bg);border:none;color:var(--t2);
+  padding:28px 32px;font-size:15px;line-height:1.8;outline:none;
+  resize:none;font-family:var(--font);
+}
+/* ── REMINDERS VIEW ──────────────────────────── */
+.rem-view-wrap{padding:24px}
+.rem-view-wrap h2{font-size:22px;font-weight:900;letter-spacing:-.02em;margin-bottom:20px}
+.rem-group{margin-bottom:24px}
+.rem-group-title{
+  font-size:10px;font-weight:800;color:var(--t4);
+  letter-spacing:.09em;text-transform:uppercase;margin-bottom:10px;
+  display:flex;align-items:center;gap:8px;
+}
+.rem-group-title::after{content:'';flex:1;height:1px;background:var(--b1)}
+.rem-card{
+  background:var(--s2);border:1px solid var(--b1);border-radius:8px;
+  padding:14px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;
+  transition:background .1s;
+}
+.rem-card:hover{background:var(--s3)}
+.rem-card.done{opacity:.45}
+.rem-card .rc-check{
+  width:20px;height:20px;border-radius:6px;border:2px solid var(--b2);
+  background:none;cursor:pointer;flex-shrink:0;appearance:none;transition:all .12s;position:relative;
+}
+.rem-card .rc-check:checked{background:var(--green);border-color:var(--green)}
+.rem-card .rc-check:checked::after{
+  content:'✓';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  color:#fff;font-size:12px;font-weight:900;
+}
+.rem-card .rc-info{flex:1}
+.rem-card .rc-title{font-size:13px;font-weight:700}
+.rem-card .rc-person{font-size:11px;color:var(--blue);cursor:pointer;font-weight:600}
+.rem-card .rc-person:hover{text-decoration:underline}
+.rem-card .rc-notes{font-size:12px;color:var(--t3);margin-top:2px}
+.rem-card .rc-due{font-size:11px;color:var(--t3);text-align:right;flex-shrink:0}
+.rem-card .rc-due.overdue{color:var(--red)}
+.rem-type-badge{
+  border-radius:4px;padding:2px 8px;font-size:9px;font-weight:800;
+  letter-spacing:.05em;text-transform:uppercase;
+}
+.rem-del{
+  background:none;border:none;color:var(--t4);cursor:pointer;
+  font-size:16px;padding:2px 6px;transition:color .1s;
+}
+.rem-del:hover{color:var(--red)}
+/* ── TAGS VIEW ───────────────────────────────── */
+.tags-wrap{padding:24px}
+.tags-wrap h2{font-size:22px;font-weight:900;letter-spacing:-.02em;margin-bottom:20px}
+.tags-grid{display:flex;flex-wrap:wrap;gap:10px}
+.tag-chip{
+  display:flex;align-items:center;gap:8px;
+  background:var(--s2);border:1px solid var(--b1);border-radius:8px;
+  padding:10px 16px;cursor:pointer;transition:all .12s;
+}
+.tag-chip:hover{background:var(--s3);border-color:var(--b2)}
+.tag-chip .tc-name{font-size:13px;font-weight:700}
+.tag-chip .tc-count{
+  background:var(--s4);color:var(--t3);border-radius:12px;
+  padding:2px 8px;font-size:11px;font-weight:700;
+}
+/* ── AVATAR ──────────────────────────────────── */
+.av{
+  border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-weight:800;flex-shrink:0;letter-spacing:-.02em;
+}
+/* ── BUCKET PILL ─────────────────────────────── */
+.bpill{
+  border-radius:5px;padding:3px 9px;font-size:10px;
+  font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+  white-space:nowrap;border:1px solid;display:inline-flex;
+}
+.tier-pill{
+  border-radius:5px;padding:3px 9px;font-size:10px;
+  font-weight:800;letter-spacing:.04em;text-transform:uppercase;
+}
+/* ── BOTTOM BAR ──────────────────────────────── */
+#bottom-bar{
+  position:fixed;bottom:0;left:var(--sb);right:0;height:var(--bb);
+  background:var(--s1);border-top:1px solid var(--b1);
+  display:flex;align-items:center;justify-content:flex-end;
+  gap:10px;padding:0 20px;z-index:150;
+}
+.bb-btn{
+  background:var(--s3);border:1px solid var(--b1);color:var(--t2);
+  border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;
+  transition:all .12s;
+}
+.bb-btn:hover{background:var(--b1);color:var(--txt)}
+.bb-btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.bb-btn.primary:hover{opacity:.88}
+/* ── MODALS ──────────────────────────────────── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:500;
+  display:none;align-items:flex-start;justify-content:center;
+  padding:40px 20px;overflow-y:auto;
+}
+.modal-overlay.open{display:flex}
+.modal-box{
+  background:var(--s2);border:1px solid var(--b1);border-radius:14px;
+  width:100%;max-width:600px;padding:28px;
+  animation:modalIn .2s ease;
+}
+@keyframes modalIn{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+.modal-head h2{font-size:18px;font-weight:900;letter-spacing:-.02em}
+.modal-close{background:none;border:none;color:var(--t4);font-size:20px;transition:color .1s}
+.modal-close:hover{color:var(--txt)}
+.form-tabs{display:flex;gap:2px;background:var(--s3);border-radius:8px;padding:3px;margin-bottom:22px}
+.ftab{
+  flex:1;background:none;border:none;color:var(--t4);
+  padding:7px;font-size:11px;font-weight:700;border-radius:6px;transition:all .1s;
+}
+.ftab.active{background:var(--b1);color:var(--txt)}
+.ftab-pane{display:none}
+.ftab-pane.active{display:block}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.fg{display:flex;flex-direction:column;gap:5px}
+.fg.full{grid-column:1/-1}
+.fg label{font-size:10px;font-weight:800;color:var(--t4);letter-spacing:.07em;text-transform:uppercase}
+.fi,.fs,.ft{
+  background:var(--s1);border:1px solid var(--b1);border-radius:8px;
+  padding:10px 13px;color:var(--txt);font-size:13px;outline:none;
+  font-family:var(--font);transition:border-color .15s;
+}
+.fi:focus,.fs:focus,.ft:focus{border-color:var(--blue)}
+.fi::placeholder,.ft::placeholder{color:var(--t4)}
+.ft{resize:vertical;min-height:90px}
+.tag-input-box{
+  background:var(--s1);border:1px solid var(--b1);border-radius:8px;
+  padding:7px 10px;display:flex;flex-wrap:wrap;gap:5px;min-height:42px;align-items:center;
+}
+.tpill{
+  background:var(--s4);color:var(--t2);border-radius:5px;
+  padding:3px 8px;font-size:12px;display:flex;align-items:center;gap:4px;
+}
+.tpill-x{background:none;border:none;color:var(--t4);font-size:14px;padding:0;line-height:1;cursor:pointer}
+.tpill-x:hover{color:var(--red)}
+.tag-fi{
+  background:none;border:none;outline:none;color:var(--txt);
+  font-size:12px;font-family:var(--font);min-width:80px;flex:1;
+}
+.tag-fi::placeholder{color:var(--t4)}
+.modal-foot{display:flex;justify-content:space-between;align-items:center;margin-top:24px}
+.modal-foot-r{display:flex;gap:8px}
+.btn-del{
+  background:#1a050520;border:1px solid #7f1d1d60;color:var(--red);
+  border-radius:8px;padding:10px 16px;font-size:12px;font-weight:700;display:none;
+}
+.btn-del:hover{background:#7f1d1d30}
+.btn-cancel{
+  background:none;border:1px solid var(--b1);color:var(--t2);
+  border-radius:8px;padding:10px 16px;font-size:12px;
+}
+.btn-cancel:hover{background:var(--s3)}
+.btn-save{
+  background:var(--blue);border:none;color:#fff;
+  border-radius:8px;padding:10px 18px;font-size:12px;font-weight:800;
+}
+.btn-save:hover{opacity:.88}
+/* ── SMALL REMINDER MODAL ────────────────────── */
+#rem-modal .modal-box{max-width:420px}
+/* ── DOC MODAL ───────────────────────────────── */
+#doc-modal .modal-box{max-width:400px}
+/* ── TOAST / LOADER ──────────────────────────── */
+#toast{
+  position:fixed;bottom:calc(var(--bb) + 14px);right:20px;
+  background:var(--s3);border:1px solid var(--b2);color:var(--txt);
+  border-radius:8px;padding:11px 18px;font-size:13px;font-weight:600;
+  z-index:9000;pointer-events:none;
+  opacity:0;transform:translateY(10px);transition:all .22s;
+}
+#toast.show{opacity:1;transform:translateY(0)}
+#loader{
+  position:fixed;top:16px;right:20px;
+  background:var(--s3);border:1px solid var(--b2);color:var(--t2);
+  border-radius:8px;padding:9px 16px;font-size:12px;z-index:9001;
+  display:none;align-items:center;gap:8px;
+}
+#loader.show{display:flex}
+.spin{
+  width:13px;height:13px;border:2px solid var(--b2);
+  border-top-color:var(--blue);border-radius:50%;
+  animation:sp .6s linear infinite;
+}
+@keyframes sp{to{transform:rotate(360deg)}}
+/* ── EMPTY STATE ─────────────────────────────── */
+.empty{
+  display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:70px 20px;color:var(--t4);
+}
+.empty .ei{font-size:40px;margin-bottom:12px}
+.empty .et{font-size:14px}
+/* ── RESPONSIVE ──────────────────────────────── */
+@media(max-width:900px){
+  .stat-row{grid-template-columns:1fr 1fr}
+  .dash-grid{grid-template-columns:1fr}
+  .cd-sections{grid-template-columns:1fr}
+  .cd-section.full{grid-column:1}
+}
+@media(max-width:768px){
+  #sidebar{transform:translateX(-100%)}
+  #sidebar.open{transform:translateX(0)}
+  #app-body{margin-left:0}
+  #bottom-bar{left:0;justify-content:space-around}
+  .bb-btn{flex:1;text-align:center}
+  #hamburger{display:block}
+  .stat-row{grid-template-columns:1fr 1fr}
+}
+@media(max-width:480px){
+  .stat-row{grid-template-columns:1fr}
+  #cards-view{grid-template-columns:1fr}
+}
 </style>
 </head>
 <body>
 
+<!-- ───────────────────── AUTH ───────────────────── -->
+<div id="auth-screen">
+  <div class="auth-box">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">◈</div>
+      <div>
+        <div class="auth-logo-name">ORBIT</div>
+        <div class="auth-logo-ver">Personal CRM — v1.2</div>
+      </div>
+    </div>
+    <div id="auth-error" class="auth-error"></div>
+    <h1 class="auth-title" id="auth-title">Sign In</h1>
+    <p class="auth-sub" id="auth-sub">Access your personal CRM</p>
+    <div class="auth-field">
+      <label class="auth-label">Email</label>
+      <input class="auth-input" id="auth-email" type="email" placeholder="you@email.com" autocomplete="email"/>
+    </div>
+    <div class="auth-field">
+      <label class="auth-label">Password</label>
+      <input class="auth-input" id="auth-password" type="password" placeholder="••••••••" autocomplete="current-password"/>
+    </div>
+    <button class="auth-btn" id="auth-submit">Sign In</button>
+    <div class="auth-toggle">
+      <span id="auth-toggle-link">Need an account? Create one</span>
+    </div>
+    <div class="auth-note" id="auth-note" style="display:none">
+      ℹ️ To create an account without email confirmation, go to<br>
+      <strong>Supabase → Authentication → Settings → disable "Confirm email"</strong>
+    </div>
+  </div>
+</div>
+
+<!-- ───────────────────── APP ────────────────────── -->
 <div id="app">
 
-  <!-- Error Banner -->
-  <div id="error-banner">
-    ⚠ Could not connect to Supabase. Check your URL and anon key in the config at the top of this file.
-  </div>
-
-  <!-- Header -->
-  <div id="header">
-    <div class="logo">
-      <div class="logo-icon">◈</div>
+  <!-- SIDEBAR -->
+  <div id="sidebar-overlay"></div>
+  <div id="sidebar">
+    <div class="sb-logo">
+      <div class="sb-logo-icon">◈</div>
       <div>
-        <div class="logo-text">ORBIT</div>
-        <div class="logo-sub">Personal CRM</div>
+        <div class="sb-logo-text">ORBIT</div>
+        <div class="sb-logo-ver">v1.2</div>
       </div>
     </div>
-    <div class="header-right">
-      <span id="total-count">— contacts</span>
-      <button id="btn-add">+ Add Contact</button>
+    <nav class="sb-nav">
+      <div class="sb-section">Menu</div>
+      <button class="nav-item active" data-nav="dashboard">
+        <span class="nav-icon">⊡</span> Dashboard
+      </button>
+      <button class="nav-item" data-nav="people">
+        <span class="nav-icon">◉</span> People
+      </button>
+      <button class="nav-item" data-nav="reminders">
+        <span class="nav-icon">◷</span> Reminders
+        <span class="nav-badge" id="nav-badge" style="display:none">0</span>
+      </button>
+      <button class="nav-item" data-nav="tags">
+        <span class="nav-icon">◈</span> Tags
+      </button>
+    </nav>
+    <div class="sb-footer">
+      <div class="sb-user" id="sb-user-area">
+        <div class="sb-avatar" id="sb-avatar">?</div>
+        <div class="sb-user-email" id="sb-email">—</div>
+        <span class="sb-signout" id="btn-signout" title="Sign out">⏏</span>
+      </div>
     </div>
   </div>
 
-  <!-- Bucket Tabs -->
-  <div id="bucket-bar"></div>
+  <!-- MAIN BODY -->
+  <div id="app-body">
 
-  <!-- Toolbar -->
-  <div id="toolbar">
-    <div id="search-wrap">
-      <span class="search-icon">⌕</span>
-      <input id="search-input" type="text" placeholder="Search name, company, tag…" />
-    </div>
-    <div class="view-toggle">
-      <button class="view-btn active" data-view="list">≡ List</button>
-      <button class="view-btn" data-view="cards">⊞ Cards</button>
-    </div>
-    <select id="sort-select">
-      <option value="name">Sort: Name</option>
-      <option value="company">Sort: Company</option>
-      <option value="bucket">Sort: Bucket</option>
-      <option value="last_contact">Sort: Last Contact</option>
-      <option value="created_at">Sort: Date Added</option>
-    </select>
-    <span id="contact-count"></span>
-  </div>
-
-  <!-- Main -->
-  <div id="main">
-    <div id="contact-area">
-      <!-- List View -->
-      <table id="list-view" style="display:none">
-        <thead>
-          <tr>
-            <th data-key="name">Name</th>
-            <th data-key="company">Company</th>
-            <th data-key="bucket">Bucket</th>
-            <th data-key="last_contact">Last Contact</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="list-body"></tbody>
-      </table>
-
-      <!-- Cards View -->
-      <div id="cards-view" style="display:none"></div>
-
-      <!-- Empty -->
-      <div id="empty-state">
-        <div class="empty-icon">◌</div>
-        <div class="empty-text">No contacts found</div>
+    <!-- TOP BAR -->
+    <div id="top-bar">
+      <button id="hamburger">☰</button>
+      <div id="top-search-wrap">
+        <span class="si">⌕</span>
+        <input id="top-search" type="text" placeholder="Search people…"/>
+      </div>
+      <div class="top-actions">
+        <button class="btn-icon" id="btn-notif" title="Reminders" onclick="navigate('reminders')">
+          🔔<span class="notif-dot" id="notif-dot"></span>
+        </button>
+        <button class="btn-primary" id="btn-add-contact">+ Add Person</button>
       </div>
     </div>
 
-    <!-- Detail Pane -->
-    <div id="detail-pane">
-      <div class="dp-header">
-        <div style="display:flex;align-items:center;gap:12px">
-          <div id="dp-avatar"></div>
-          <div>
-            <div class="dp-name" id="dp-name"></div>
-            <div class="dp-sub" id="dp-sub"></div>
+    <!-- CONTENT -->
+    <div id="content">
+
+      <!-- DASHBOARD -->
+      <div id="view-dashboard" class="view active">
+        <div class="dash-wrap" id="dash-inner"></div>
+      </div>
+
+      <!-- PEOPLE -->
+      <div id="view-people" class="view" style="display:none;height:100%;display:none;flex-direction:column">
+        <div id="bucket-bar"></div>
+        <div id="people-toolbar">
+          <div class="view-tog">
+            <button class="vtbtn active" data-vm="list">≡ List</button>
+            <button class="vtbtn" data-vm="cards">⊞ Cards</button>
+          </div>
+          <select class="sort-sel" id="sort-sel">
+            <option value="name">Sort: Name</option>
+            <option value="company">Sort: Company</option>
+            <option value="bucket">Sort: Bucket</option>
+            <option value="last_contact">Sort: Last Contact</option>
+            <option value="created_at">Sort: Date Added</option>
+          </select>
+          <span class="pc-count" id="pc-count"></span>
+        </div>
+        <div id="people-content" style="flex:1;overflow-y:auto">
+          <table id="list-view" style="display:none;width:100%;border-collapse:collapse">
+            <thead>
+              <tr>
+                <th data-key="name">Name</th>
+                <th data-key="company">Company</th>
+                <th data-key="bucket">Bucket</th>
+                <th data-key="tier">Tier</th>
+                <th data-key="last_contact">Last Contact</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="list-body"></tbody>
+          </table>
+          <div id="cards-view" style="display:none"></div>
+          <div id="people-empty" class="empty" style="display:none">
+            <div class="ei">◌</div>
+            <div class="et">No contacts found</div>
           </div>
         </div>
-        <button class="dp-close" id="dp-close">✕</button>
       </div>
-      <div id="dp-bucket"></div>
-      <div id="dp-stale"></div>
-      <div id="dp-fields"></div>
-      <button id="dp-edit-btn">✎ Edit Contact</button>
-    </div>
-  </div>
 
-</div>
+      <!-- CONTACT DETAIL -->
+      <div id="view-contact" class="view" style="display:none">
+        <div class="cd-wrap" id="cd-inner"></div>
+      </div>
 
-<!-- Modal -->
-<div id="modal-overlay">
-  <div id="modal">
-    <div class="modal-header">
-      <div class="modal-title-wrap">
-        <div id="modal-avatar"></div>
-        <div>
-          <div class="modal-title" id="modal-title">New Contact</div>
-          <div class="modal-sub" id="modal-sub">Add to ORBIT</div>
+      <!-- NOTES FULL SCREEN -->
+      <div id="view-notes" class="view" style="display:none;height:100%">
+        <div class="notes-full-wrap">
+          <div class="notes-full-header">
+            <button class="cd-back" id="notes-back">← Back</button>
+            <span class="notes-full-title" id="notes-for-name">Notes</span>
+            <button id="notes-save-btn">Save Notes</button>
+          </div>
+          <textarea id="notes-textarea" placeholder="Write anything about this person…"></textarea>
         </div>
       </div>
-      <button class="modal-close" id="modal-close">✕</button>
+
+      <!-- REMINDERS -->
+      <div id="view-reminders" class="view" style="display:none">
+        <div class="rem-view-wrap" id="rem-inner"></div>
+      </div>
+
+      <!-- TAGS -->
+      <div id="view-tags" class="view" style="display:none">
+        <div class="tags-wrap" id="tags-inner"></div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /app-body -->
+
+  <!-- BOTTOM BAR -->
+  <div id="bottom-bar">
+    <button class="bb-btn" id="bb-add-rem">+ Reminder</button>
+    <button class="bb-btn primary" id="bb-add-contact">+ Add Person</button>
+  </div>
+
+</div><!-- /app -->
+
+<!-- ─── CONTACT MODAL ─────────────────────────── -->
+<div class="modal-overlay" id="contact-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="cm-title">Add Person</h2>
+      <button class="modal-close" id="cm-close">✕</button>
+    </div>
+    <div class="form-tabs" id="form-tabs">
+      <button class="ftab active" data-tab="profile">Profile</button>
+      <button class="ftab" data-tab="contact">Contact</button>
+      <button class="ftab" data-tab="social">Social</button>
+      <button class="ftab" data-tab="notes">Notes</button>
+      <button class="ftab" data-tab="docs">Docs</button>
+    </div>
+
+    <!-- PROFILE TAB -->
+    <div class="ftab-pane active" id="tab-profile">
+      <div class="form-grid">
+        <div class="fg full">
+          <label>Full Name *</label>
+          <input class="fi" id="m-name" placeholder="Full Name"/>
+        </div>
+        <div class="fg">
+          <label>Company</label>
+          <input class="fi" id="m-company" placeholder="Company"/>
+        </div>
+        <div class="fg">
+          <label>Role / Title</label>
+          <input class="fi" id="m-role" placeholder="Job Title"/>
+        </div>
+        <div class="fg">
+          <label>Manager / Reports To</label>
+          <input class="fi" id="m-manager" placeholder="Their manager"/>
+        </div>
+        <div class="fg">
+          <label>Birthday</label>
+          <input class="fi" id="m-birthday" type="date"/>
+        </div>
+        <div class="fg">
+          <label>Last Contact</label>
+          <input class="fi" id="m-last-contact" type="date"/>
+        </div>
+        <div class="fg">
+          <label>Bucket</label>
+          <select class="fs" id="m-bucket"></select>
+        </div>
+        <div class="fg">
+          <label>Tier</label>
+          <select class="fs" id="m-tier">
+            <option value="VIP">⭐ VIP</option>
+            <option value="Warm" selected>🔥 Warm</option>
+            <option value="Cold">❄️ Cold</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- CONTACT TAB -->
+    <div class="ftab-pane" id="tab-contact">
+      <div class="form-grid">
+        <div class="fg full">
+          <label>Email</label>
+          <input class="fi" id="m-email" type="email" placeholder="email@domain.com"/>
+        </div>
+        <div class="fg">
+          <label>Phone</label>
+          <input class="fi" id="m-phone" placeholder="Phone"/>
+        </div>
+        <div class="fg full">
+          <label>Address</label>
+          <input class="fi" id="m-address" placeholder="City, State or full address"/>
+        </div>
+      </div>
+    </div>
+
+    <!-- SOCIAL TAB -->
+    <div class="ftab-pane" id="tab-social">
+      <div class="form-grid">
+        <div class="fg">
+          <label>LinkedIn</label>
+          <input class="fi" id="m-linkedin" placeholder="linkedin.com/in/..."/>
+        </div>
+        <div class="fg">
+          <label>Twitter / X</label>
+          <input class="fi" id="m-twitter" placeholder="@handle"/>
+        </div>
+        <div class="fg">
+          <label>Instagram</label>
+          <input class="fi" id="m-instagram" placeholder="@handle"/>
+        </div>
+        <div class="fg">
+          <label>TikTok</label>
+          <input class="fi" id="m-tiktok" placeholder="@handle"/>
+        </div>
+        <div class="fg">
+          <label>YouTube</label>
+          <input class="fi" id="m-youtube" placeholder="Channel URL"/>
+        </div>
+        <div class="fg">
+          <label>Followers / Audience</label>
+          <input class="fi" id="m-followers" type="number" placeholder="Total followers"/>
+        </div>
+      </div>
+    </div>
+
+    <!-- NOTES TAB -->
+    <div class="ftab-pane" id="tab-notes">
+      <div class="form-grid">
+        <div class="fg full">
+          <label>Goals / Objectives</label>
+          <textarea class="ft" id="m-goals" placeholder="What are their goals? What are you trying to accomplish together?"></textarea>
+        </div>
+        <div class="fg full">
+          <label>Notes</label>
+          <textarea class="ft" id="m-notes" placeholder="Everything worth remembering…" style="min-height:130px"></textarea>
+        </div>
+        <div class="fg full">
+          <label>Tags (Enter or # to add)</label>
+          <div class="tag-input-box" id="m-tag-wrap">
+            <input id="m-tag-fi" class="tag-fi" placeholder="type tag + Enter…"/>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DOCS TAB -->
+    <div class="ftab-pane" id="tab-docs">
+      <div id="m-docs-list" style="margin-bottom:14px"></div>
+      <div style="display:flex;gap:10px">
+        <input class="fi" id="doc-name-fi" placeholder="Document name" style="flex:1"/>
+        <input class="fi" id="doc-url-fi" placeholder="URL / Link" style="flex:2"/>
+        <button class="btn-save" id="doc-add-btn" style="padding:10px 14px">+</button>
+      </div>
+      <div style="font-size:11px;color:var(--t4);margin-top:8px">Paste Google Drive, Dropbox, or any public URL</div>
+    </div>
+
+    <div class="modal-foot">
+      <button class="btn-del" id="cm-delete">Delete Person</button>
+      <div class="modal-foot-r">
+        <button class="btn-cancel" id="cm-cancel">Cancel</button>
+        <button class="btn-save" id="cm-save">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── REMINDER MODAL ────────────────────────── -->
+<div class="modal-overlay" id="rem-modal">
+  <div class="modal-box">
+    <div class="modal-head">
+      <h2 id="rm-title">Add Reminder</h2>
+      <button class="modal-close" id="rm-close">✕</button>
     </div>
     <div class="form-grid">
-      <div class="form-group full">
-        <label class="form-label">Full Name</label>
-        <input class="form-input" id="f-name" placeholder="Full Name" />
+      <div class="fg full">
+        <label>Title *</label>
+        <input class="fi" id="r-title" placeholder="e.g. Follow up about proposal"/>
       </div>
-      <div class="form-group">
-        <label class="form-label">Company</label>
-        <input class="form-input" id="f-company" placeholder="Company" />
+      <div class="fg">
+        <label>Type</label>
+        <select class="fs" id="r-type">
+          <option value="follow_up">📞 Follow-Up</option>
+          <option value="birthday">🎂 Birthday</option>
+          <option value="anniversary">🎉 Anniversary</option>
+          <option value="event">📅 Event</option>
+          <option value="goal">🎯 Goal</option>
+        </select>
       </div>
-      <div class="form-group">
-        <label class="form-label">Title</label>
-        <input class="form-input" id="f-title" placeholder="Job Title" />
+      <div class="fg">
+        <label>Due Date</label>
+        <input class="fi" id="r-due" type="date"/>
       </div>
-      <div class="form-group full">
-        <label class="form-label">Email</label>
-        <input class="form-input" id="f-email" type="email" placeholder="email@domain.com" />
+      <div class="fg full">
+        <label>Notes</label>
+        <textarea class="ft" id="r-notes" placeholder="Any details…" style="min-height:70px"></textarea>
       </div>
-      <div class="form-group">
-        <label class="form-label">Phone</label>
-        <input class="form-input" id="f-phone" placeholder="Phone" />
-      </div>
-      <div class="form-group">
-        <label class="form-label">LinkedIn</label>
-        <input class="form-input" id="f-linkedin" placeholder="linkedin.com/in/..." />
-      </div>
-      <div class="form-group">
-        <label class="form-label">Bucket</label>
-        <select class="form-select" id="f-bucket"></select>
-      </div>
-      <div class="form-group">
-        <label class="form-label">Last Contact</label>
-        <input class="form-input" id="f-last-contact" type="date" />
-      </div>
-      <div class="form-group full">
-        <label class="form-label">Tags (Enter or comma to add)</label>
-        <div class="tag-input-wrap" id="tag-wrap">
-          <input id="tag-input-field" placeholder="type tag + Enter…" />
-        </div>
-      </div>
-      <div class="form-group full">
-        <label class="form-label">Notes</label>
-        <textarea class="form-textarea" id="f-notes" placeholder="Anything worth remembering…"></textarea>
-      </div>
+      <input type="hidden" id="r-person-id"/>
+      <input type="hidden" id="r-person-name"/>
     </div>
-    <div class="modal-footer">
-      <button id="btn-delete">Delete</button>
-      <div class="modal-footer-right">
-        <button id="btn-cancel">Cancel</button>
-        <button id="btn-save">Save Contact</button>
+    <div class="modal-foot">
+      <div></div>
+      <div class="modal-foot-r">
+        <button class="btn-cancel" id="rm-cancel">Cancel</button>
+        <button class="btn-save" id="rm-save">Save Reminder</button>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Loading indicator -->
-<div id="loader"><div class="loader-spin"></div><span id="loader-text">Loading…</span></div>
-
-<!-- Toast -->
+<!-- ─── TOAST / LOADER ────────────────────────── -->
 <div id="toast"></div>
+<div id="loader"><div class="spin"></div><span id="loader-txt">Loading…</span></div>
 
-<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- ═══════════════════════ JS ═══════════════════════ -->
 <script>
 'use strict';
 
-// ─── SUPABASE INIT ───
-const { createClient } = supabase;
-let db;
-try {
-  db = createClient(SUPABASE_URL, SUPABASE_ANON);
-} catch(e) {
-  document.getElementById('error-banner').classList.add('show');
-}
+// ── CONFIG ────────────────────────────────────────────
+const SUPABASE_URL  = 'https://vpnfctgdfeklqhqloaor.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwbmZjdGdkZmVrbHFocWxvYW9yIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI0Nzc3MDYsImV4cCI6MjA4ODA1MzcwNn0.NbvLAhB_2zOe_YoTLZ6WeADObjT3gyAsYn3ZFppTOec';
 
-// ─── CONFIG ───
+// Optional: add your email to restrict access. Leave [] to allow any signed-up user.
+const ALLOWED_EMAILS = [];
+
 const BUCKETS = ['All','Friends','Clients','Prospects','B2B Partners','Competitors','Acquaintances','Investors'];
 const BUCKET_COLORS = {
   Friends:        '#4ade80',
-  Clients:        '#60a5fa',
+  Clients:        '#3b82f6',
   Prospects:      '#f59e0b',
-  'B2B Partners': '#a78bfa',
-  Competitors:    '#f87171',
-  Acquaintances:  '#94a3b8',
-  Investors:      '#34d399',
+  'B2B Partners': '#a855f7',
+  Competitors:    '#ef4444',
+  Acquaintances:  '#64748b',
+  Investors:      '#14b8a6',
+};
+const TIER_STYLES = {
+  VIP:  {bg:'#f59e0b20',color:'#f59e0b',border:'#f59e0b40'},
+  Warm: {bg:'#ef444420',color:'#f87171',border:'#ef444440'},
+  Cold: {bg:'#3b82f620',color:'#60a5fa',border:'#3b82f640'},
+};
+const REM_TYPES = {
+  follow_up:   {label:'Follow-Up', color:'#3b82f6', emoji:'📞'},
+  birthday:    {label:'Birthday',  color:'#f59e0b', emoji:'🎂'},
+  anniversary: {label:'Anniversary',color:'#a855f7',emoji:'🎉'},
+  event:       {label:'Event',     color:'#22c55e', emoji:'📅'},
+  goal:        {label:'Goal',      color:'#14b8a6', emoji:'🎯'},
 };
 
-// ─── STATE ───
-let allContacts    = [];
-let filteredList   = [];
-let activeBucket   = 'All';
-let searchQuery    = '';
-let currentView    = 'list';
-let sortKey        = 'name';
-let sortDir        = 1;
-let selectedId     = null;
-let editingId      = null;
-let formTags       = [];
+// ── SUPABASE INIT ─────────────────────────────────────
+const { createClient } = window.supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-// ─── UTILS ───
-function today() { return new Date().toISOString().split('T')[0]; }
+// ── STATE ─────────────────────────────────────────────
+const S = {
+  view: 'dashboard',
+  prevView: null,
+  people: [],
+  reminders: [],
+  user: null,
+  activeBucket: 'All',
+  search: '',
+  vm: 'list',
+  sortKey: 'name',
+  sortDir: 1,
+  editId: null,
+  detailId: null,
+  formTags: [],
+  formDocs: [],
+  notesPersonId: null,
+  remEditId: null,
+  filterTag: null,
+};
 
-function daysSince(dateStr) {
-  if (!dateStr) return null;
-  return Math.floor((Date.now() - new Date(dateStr)) / 86400000);
+// ── UTILITIES ─────────────────────────────────────────
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function today(){ return new Date().toISOString().split('T')[0]; }
+
+function daysSince(d){
+  if(!d) return null;
+  return Math.floor((Date.now() - new Date(d)) / 86400000);
 }
 
-function avatarHTML(name, size = 34) {
-  const initials = (name || '?').split(' ').map(w => w[0]).slice(0,2).join('').toUpperCase();
-  const hue = (name || '').split('').reduce((a,c) => a + c.charCodeAt(0), 0) % 360;
-  return `<div class="avatar" style="width:${size}px;height:${size}px;font-size:${Math.round(size*0.36)}px;background:hsl(${hue},55%,28%);border:1.5px solid hsl(${hue},55%,42%);color:hsl(${hue},80%,75%)">${initials}</div>`;
+function daysUntil(d){
+  if(!d) return null;
+  return Math.floor((new Date(d) - Date.now()) / 86400000);
 }
 
-function pillHTML(bucket) {
-  const color = BUCKET_COLORS[bucket] || '#94a3b8';
-  return `<span class="bucket-pill" style="background:${color}18;color:${color};border-color:${color}40">${bucket}</span>`;
+function nextBirthday(bday){
+  if(!bday) return null;
+  const now = new Date();
+  const [,m,day] = bday.split('-');
+  let next = new Date(now.getFullYear(), parseInt(m)-1, parseInt(day));
+  if(next < now) next = new Date(now.getFullYear()+1, parseInt(m)-1, parseInt(day));
+  return Math.floor((next - now) / 86400000);
 }
 
-function staleHTML(ds) {
-  if (ds === null) return '';
-  const stale = ds > 60;
-  const bg    = stale ? '#7c2d1220' : '#1e2740';
-  const bdr   = stale ? '#7c2d1240' : '#2e3650';
-  const lc    = stale ? '#f87171'   : '#64748b';
-  const vc    = stale ? '#fca5a5'   : '#94a3b8';
-  const label = ds === 0 ? 'Today' : `${ds} days ago`;
-  return `<div class="stale-box" style="background:${bg};border-color:${bdr}">
-    <span class="stale-label" style="color:${lc}">Last Contact: </span>
-    <span style="color:${vc}">${label}</span>
-  </div>`;
+function formatDate(d){
+  if(!d) return '';
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
 }
 
-function toast(msg) {
+function avatarHTML(name, size=34){
+  const ini = (name||'?').trim().split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
+  const hue = (name||'').split('').reduce((a,c)=>a+c.charCodeAt(0),0)%360;
+  return `<div class="av" style="width:${size}px;height:${size}px;font-size:${Math.round(size*.37)}px;background:hsl(${hue},45%,22%);border:1.5px solid hsl(${hue},45%,35%);color:hsl(${hue},70%,70%)">${ini}</div>`;
+}
+
+function pillHTML(bucket){
+  const c = BUCKET_COLORS[bucket]||'#64748b';
+  return `<span class="bpill" style="background:${c}18;color:${c};border-color:${c}40">${esc(bucket)}</span>`;
+}
+
+function tierHTML(tier){
+  if(!tier||!TIER_STYLES[tier]) return '';
+  const t = TIER_STYLES[tier];
+  return `<span class="tier-pill" style="background:${t.bg};color:${t.color};border:1px solid ${t.border}">${tier}</span>`;
+}
+
+function toast(msg, dur=2800){
   const el = document.getElementById('toast');
   el.textContent = msg;
   el.classList.add('show');
-  setTimeout(() => el.classList.remove('show'), 2600);
+  setTimeout(()=>el.classList.remove('show'), dur);
 }
 
-function setLoading(msg) {
+function setLoader(msg){
   const el = document.getElementById('loader');
-  if (msg) {
-    document.getElementById('loader-text').textContent = msg;
-    el.classList.add('show');
-  } else {
-    el.classList.remove('show');
+  if(msg){ document.getElementById('loader-txt').textContent=msg; el.classList.add('show'); }
+  else el.classList.remove('show');
+}
+
+function fmtFollowers(n){
+  if(!n||n<1000) return n||'';
+  if(n<1000000) return (n/1000).toFixed(1).replace(/\.0$/,'')+'K';
+  return (n/1000000).toFixed(1).replace(/\.0$/,'')+'M';
+}
+
+// ── SUPABASE CRUD ─────────────────────────────────────
+async function loadAll(){
+  setLoader('Loading…');
+  try{
+    const [pRes, rRes] = await Promise.all([
+      db.from('people').select('*').order('name'),
+      db.from('reminders').select('*').order('due_date')
+    ]);
+    if(pRes.error) throw pRes.error;
+    if(rRes.error) throw rRes.error;
+    S.people    = pRes.data || [];
+    S.reminders = rRes.data || [];
+    updateBadge();
+  }catch(e){ toast('⚠ Load error: '+e.message); }
+  finally{ setLoader(null); }
+}
+
+async function savePerson(payload){
+  setLoader('Saving…');
+  try{
+    let err;
+    if(S.editId){
+      ({error:err} = await db.from('people').update(payload).eq('id',S.editId));
+    } else {
+      ({error:err} = await db.from('people').insert(payload));
+    }
+    if(err) throw err;
+    toast(S.editId ? '✓ Updated' : '✓ Person added');
+    closeContactModal();
+    await loadAll();
+    if(S.view==='dashboard') renderDashboard();
+    else if(S.view==='people') renderPeople();
+    else if(S.view==='contact'&&S.editId===S.detailId) renderContactDetail(S.detailId);
+  }catch(e){ toast('✕ Save failed: '+e.message); }
+  finally{ setLoader(null); }
+}
+
+async function deletePerson(id){
+  if(!confirm('Delete this person? This cannot be undone.')) return;
+  setLoader('Deleting…');
+  try{
+    const {error:err} = await db.from('people').delete().eq('id',id);
+    if(err) throw err;
+    toast('✓ Deleted');
+    S.detailId = null;
+    closeContactModal();
+    await loadAll();
+    navigate('people');
+  }catch(e){ toast('✕ Delete failed: '+e.message); }
+  finally{ setLoader(null); }
+}
+
+async function saveReminder(payload){
+  setLoader('Saving…');
+  try{
+    let err;
+    if(S.remEditId){
+      ({error:err} = await db.from('reminders').update(payload).eq('id',S.remEditId));
+    } else {
+      ({error:err} = await db.from('reminders').insert(payload));
+    }
+    if(err) throw err;
+    toast('✓ Reminder saved');
+    closeRemModal();
+    await loadAll();
+    renderCurrentView();
+  }catch(e){ toast('✕ Failed: '+e.message); }
+  finally{ setLoader(null); }
+}
+
+async function toggleReminder(id, done){
+  try{
+    const {error:err} = await db.from('reminders').update({completed:done}).eq('id',id);
+    if(err) throw err;
+    const r = S.reminders.find(x=>x.id===id);
+    if(r) r.completed = done;
+    updateBadge();
+    renderCurrentView();
+  }catch(e){ toast('✕ '+e.message); }
+}
+
+async function deleteReminder(id){
+  try{
+    const {error:err} = await db.from('reminders').delete().eq('id',id);
+    if(err) throw err;
+    S.reminders = S.reminders.filter(r=>r.id!==id);
+    updateBadge();
+    toast('✓ Reminder removed');
+    renderCurrentView();
+  }catch(e){ toast('✕ '+e.message); }
+}
+
+async function saveNotesForPerson(personId, notes){
+  try{
+    const {error:err} = await db.from('people').update({notes}).eq('id',personId);
+    if(err) throw err;
+    const p = S.people.find(x=>x.id===personId);
+    if(p) p.notes = notes;
+    toast('✓ Notes saved');
+  }catch(e){ toast('✕ '+e.message); }
+}
+
+// ── AUTH ──────────────────────────────────────────────
+function isAllowed(email){
+  if(!ALLOWED_EMAILS.length) return true;
+  return ALLOWED_EMAILS.map(e=>e.toLowerCase()).includes((email||'').toLowerCase());
+}
+
+async function doAuth(mode){
+  const email = document.getElementById('auth-email').value.trim();
+  const pass  = document.getElementById('auth-password').value;
+  const errEl = document.getElementById('auth-error');
+  errEl.style.display = 'none';
+  if(!email||!pass){ showAuthError('Email and password required.'); return; }
+
+  setLoader(mode==='in' ? 'Signing in…' : 'Creating account…');
+  try{
+    let res;
+    if(mode==='in'){
+      res = await db.auth.signInWithPassword({email, password:pass});
+    } else {
+      res = await db.auth.signUp({email, password:pass});
+    }
+    if(res.error) throw res.error;
+    const user = res.data?.user || res.data?.session?.user;
+    if(user && !isAllowed(user.email)){
+      await db.auth.signOut();
+      throw new Error('This email is not authorized to access ORBIT.');
+    }
+    // Auth state change listener will handle showing the app
+  }catch(e){ showAuthError(e.message); }
+  finally{ setLoader(null); }
+}
+
+function showAuthError(msg){
+  const el = document.getElementById('auth-error');
+  el.textContent = msg;
+  el.style.display = 'block';
+}
+
+// ── NAVIGATION ────────────────────────────────────────
+function navigate(view){
+  S.prevView = S.view;
+  S.view = view;
+  // Hide all views
+  document.querySelectorAll('.view').forEach(v=>{ v.style.display='none'; v.classList.remove('active'); });
+  // Show target
+  const el = document.getElementById('view-'+view);
+  if(el){ el.style.display='block'; el.classList.add('active'); }
+  // People view needs flex
+  if(view==='people'){
+    const pv = document.getElementById('view-people');
+    if(pv){ pv.style.display='flex'; pv.style.flexDirection='column'; pv.style.height='100%'; }
   }
+  // Update sidebar active
+  document.querySelectorAll('.nav-item').forEach(n=>{
+    n.classList.toggle('active', n.dataset.nav===view);
+  });
+  // Render
+  if(view==='dashboard')  renderDashboard();
+  if(view==='people')     renderPeople();
+  if(view==='reminders')  renderReminders();
+  if(view==='tags')       renderTags();
+  // Close sidebar on mobile
+  if(window.innerWidth<=768) closeSidebar();
 }
 
-// ─── SUPABASE CRUD ───
-async function fetchContacts() {
-  if (!db) return;
-  setLoading('Loading…');
-  const { data, error } = await db.from('people').select('*').order('name');
-  setLoading(null);
-  if (error) { showError('Failed to load contacts: ' + error.message); return; }
-  allContacts = data || [];
-  updateTotalCount();
-  applyFilters();
+function renderCurrentView(){
+  if(S.view==='dashboard')  renderDashboard();
+  if(S.view==='people')     renderPeople();
+  if(S.view==='reminders')  renderReminders();
+  if(S.view==='tags')       renderTags();
+  if(S.view==='contact'&&S.detailId) renderContactDetail(S.detailId);
 }
 
-async function saveContact(payload) {
-  if (!db) return;
-  setLoading('Saving…');
-  let error;
-  if (editingId) {
-    ({ error } = await db.from('people').update(payload).eq('id', editingId));
-  } else {
-    ({ error } = await db.from('people').insert(payload));
-  }
-  setLoading(null);
-  if (error) { toast('❌ Save failed: ' + error.message); return; }
-  toast(editingId ? '✓ Contact updated' : '✓ Contact added');
-  closeModal();
-  await fetchContacts();
+// ── DASHBOARD ─────────────────────────────────────────
+function renderDashboard(){
+  const wrap = document.getElementById('dash-inner');
+  if(!wrap) return;
+
+  const hour = new Date().getHours();
+  const greet = hour<12 ? 'Good morning' : hour<17 ? 'Good afternoon' : 'Good evening';
+
+  const dueTodayOrOver = S.reminders.filter(r=>!r.completed && r.due_date && r.due_date<=today());
+  const upcoming7      = S.reminders.filter(r=>!r.completed && r.due_date && r.due_date>today() && daysUntil(r.due_date)<=7);
+  const stale          = S.people.filter(p=>{ const d=daysSince(p.last_contact); return d!==null&&d>=30; }).sort((a,b)=>daysSince(b.last_contact)-daysSince(a.last_contact)).slice(0,5);
+  const birthdays      = S.people.filter(p=>p.birthday).map(p=>({...p,_bdays:nextBirthday(p.birthday)})).filter(p=>p._bdays!==null&&p._bdays<=30).sort((a,b)=>a._bdays-b._bdays).slice(0,5);
+  const vips           = S.people.filter(p=>p.tier==='VIP').length;
+  const recentPeople   = [...S.people].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).slice(0,5);
+
+  wrap.innerHTML = `
+    <div class="dash-greeting">${greet} 👋</div>
+    <div class="dash-sub">${S.people.length} people in ORBIT · ${dueTodayOrOver.length} action${dueTodayOrOver.length!==1?'s':''} due</div>
+
+    <div class="stat-row">
+      <div class="stat-card">
+        <div class="stat-label">Total People</div>
+        <div class="stat-val">${S.people.length}</div>
+        <div class="stat-hint">across all buckets</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">VIP Contacts</div>
+        <div class="stat-val" style="color:var(--amber)">${vips}</div>
+        <div class="stat-hint">tier: VIP</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Actions Due</div>
+        <div class="stat-val" style="color:${dueTodayOrOver.length>0?'var(--red)':'var(--green)'}">${dueTodayOrOver.length}</div>
+        <div class="stat-hint">today or overdue</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Birthdays Soon</div>
+        <div class="stat-val" style="color:var(--purp)">${birthdays.length}</div>
+        <div class="stat-hint">within 30 days</div>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="dash-panel">
+        <div class="dp-head"><h3>⚡ Action Required</h3><span class="dp-count">${dueTodayOrOver.length} due</span></div>
+        <div class="dp-body">
+          ${dueTodayOrOver.length===0
+            ? `<div class="dp-empty">All clear! Nothing overdue.</div>`
+            : dueTodayOrOver.slice(0,6).map(r=>{
+                const rt = REM_TYPES[r.type]||REM_TYPES.follow_up;
+                const d  = daysSince(r.due_date);
+                return `<div class="dp-row" data-rem-id="${r.id}">
+                  <span style="font-size:18px">${rt.emoji}</span>
+                  <div style="flex:1">
+                    <div class="dr-name">${esc(r.title)}</div>
+                    <div class="dr-meta ${d>0?'overdue':''}">${r.person_name||''} · ${d===0?'Today':d>0?d+'d overdue':'Due '+formatDate(r.due_date)}</div>
+                  </div>
+                  <button class="dr-action" data-done-id="${r.id}">Done ✓</button>
+                </div>`;
+              }).join('')
+          }
+          ${stale.length>0 ? `
+            <div style="padding:10px 18px 6px;font-size:10px;font-weight:800;color:var(--t4);letter-spacing:.07em;text-transform:uppercase;border-top:1px solid var(--b1);margin-top:4px">Stale Contacts</div>
+            ${stale.map(p=>`<div class="dp-row" data-person-id="${p.id}">
+              ${avatarHTML(p.name,28)}
+              <div style="flex:1">
+                <div class="dr-name">${esc(p.name)}</div>
+                <div class="dr-meta">${daysSince(p.last_contact)}d since last contact</div>
+              </div>
+              <button class="dr-action" data-followup-id="${p.id}" data-followup-name="${esc(p.name)}">Follow Up</button>
+            </div>`).join('')}
+          ` : ''}
+        </div>
+      </div>
+
+      <div class="dash-panel">
+        <div class="dp-head"><h3>🎂 Upcoming Birthdays</h3><span class="dp-count">${birthdays.length} soon</span></div>
+        <div class="dp-body">
+          ${birthdays.length===0
+            ? `<div class="dp-empty">No upcoming birthdays in 30 days.</div>`
+            : birthdays.map(p=>`<div class="dp-row" data-person-id="${p.id}">
+                ${avatarHTML(p.name,28)}
+                <div style="flex:1">
+                  <div class="dr-name">${esc(p.name)}</div>
+                  <div class="dr-meta">${p._bdays===0?'🎉 Today!':p._bdays===1?'Tomorrow':p._bdays+'d away'} · ${formatDate(p.birthday).replace(/,\s*\d{4}$/,'')}</div>
+                </div>
+              </div>`).join('')
+          }
+        </div>
+      </div>
+
+      <div class="dash-panel">
+        <div class="dp-head"><h3>📅 Coming Up (7 days)</h3><span class="dp-count">${upcoming7.length}</span></div>
+        <div class="dp-body">
+          ${upcoming7.length===0
+            ? `<div class="dp-empty">Nothing in the next 7 days.</div>`
+            : upcoming7.map(r=>{
+                const rt=REM_TYPES[r.type]||REM_TYPES.follow_up;
+                return `<div class="dp-row" data-rem-id="${r.id}">
+                  <span style="font-size:18px">${rt.emoji}</span>
+                  <div style="flex:1">
+                    <div class="dr-name">${esc(r.title)}</div>
+                    <div class="dr-meta">${r.person_name||''} · in ${daysUntil(r.due_date)}d</div>
+                  </div>
+                </div>`;
+              }).join('')
+          }
+        </div>
+      </div>
+
+      <div class="dash-panel">
+        <div class="dp-head"><h3>🕐 Recently Added</h3><span class="dp-count">${recentPeople.length}</span></div>
+        <div class="dp-body">
+          ${recentPeople.map(p=>`<div class="dp-row" data-person-id="${p.id}">
+            ${avatarHTML(p.name,28)}
+            <div style="flex:1">
+              <div class="dr-name">${esc(p.name)}</div>
+              <div class="dr-meta">${pillHTML(p.bucket)} ${p.company?'· '+esc(p.company):''}</div>
+            </div>
+          </div>`).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Dashboard events
+  wrap.querySelectorAll('[data-person-id]').forEach(el=>{
+    el.addEventListener('click', e=>{
+      if(e.target.closest('[data-followup-id]')) return;
+      openContactDetail(el.dataset.personId);
+    });
+  });
+  wrap.querySelectorAll('[data-done-id]').forEach(btn=>{
+    btn.addEventListener('click', e=>{ e.stopPropagation(); toggleReminder(btn.dataset.doneId, true); });
+  });
+  wrap.querySelectorAll('[data-followup-id]').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      e.stopPropagation();
+      openRemModal(btn.dataset.followupId, btn.dataset.followupName);
+    });
+  });
 }
 
-async function deleteContact(id) {
-  if (!db) return;
-  if (!confirm('Delete this contact? This cannot be undone.')) return;
-  setLoading('Deleting…');
-  const { error } = await db.from('people').delete().eq('id', id);
-  setLoading(null);
-  if (error) { toast('❌ Delete failed: ' + error.message); return; }
-  toast('✓ Contact deleted');
-  selectedId = null;
-  closeDetailPane();
-  closeModal();
-  await fetchContacts();
-}
-
-function showError(msg) {
-  const el = document.getElementById('error-banner');
-  el.textContent = '⚠ ' + msg;
-  el.classList.add('show');
-}
-
-// ─── FILTER & SORT ───
-function applyFilters() {
-  let list = [...allContacts];
-  if (activeBucket !== 'All') list = list.filter(c => c.bucket === activeBucket);
-  if (searchQuery.trim()) {
-    const q = searchQuery.toLowerCase();
-    list = list.filter(c =>
-      (c.name||'').toLowerCase().includes(q) ||
-      (c.company||'').toLowerCase().includes(q) ||
-      (c.email||'').toLowerCase().includes(q) ||
-      (c.bucket||'').toLowerCase().includes(q) ||
-      (c.tags||[]).some(t => t.toLowerCase().includes(q))
+// ── PEOPLE ────────────────────────────────────────────
+function getFiltered(){
+  let list = [...S.people];
+  if(S.activeBucket!=='All') list = list.filter(p=>p.bucket===S.activeBucket);
+  if(S.filterTag) list = list.filter(p=>(p.tags||[]).includes(S.filterTag));
+  if(S.search.trim()){
+    const q = S.search.toLowerCase();
+    list = list.filter(p=>
+      (p.name||'').toLowerCase().includes(q)||
+      (p.company||'').toLowerCase().includes(q)||
+      (p.email||'').toLowerCase().includes(q)||
+      (p.bucket||'').toLowerCase().includes(q)||
+      (p.tags||[]).some(t=>t.toLowerCase().includes(q))
     );
   }
-  list.sort((a,b) => {
-    const av = (a[sortKey]||'').toLowerCase();
-    const bv = (b[sortKey]||'').toLowerCase();
-    return av < bv ? -sortDir : av > bv ? sortDir : 0;
+  list.sort((a,b)=>{
+    const av=(a[S.sortKey]||'').toString().toLowerCase();
+    const bv=(b[S.sortKey]||'').toString().toLowerCase();
+    return av<bv?-S.sortDir:av>bv?S.sortDir:0;
   });
-  filteredList = list;
-  renderContacts();
-  updateTabCounts();
-  document.getElementById('contact-count').textContent = `${filteredList.length} shown`;
+  return list;
 }
 
-// ─── RENDER BUCKET TABS ───
-function renderBucketBar() {
+function renderPeople(){
+  renderBucketBar();
+  const list = getFiltered();
+  document.getElementById('pc-count').textContent = list.length+' shown';
+
+  const lv = document.getElementById('list-view');
+  const cv = document.getElementById('cards-view');
+  const ev = document.getElementById('people-empty');
+
+  if(list.length===0){
+    lv.style.display='none'; cv.style.display='none'; ev.style.display='flex'; return;
+  }
+  ev.style.display='none';
+
+  if(S.vm==='list'){
+    lv.style.display='table'; cv.style.display='none';
+    renderListView(list);
+  } else {
+    lv.style.display='none'; cv.style.display='grid';
+    renderCardsView(list);
+  }
+
+  // Update sort headers
+  document.querySelectorAll('#list-view thead th[data-key]').forEach(th=>{
+    th.classList.toggle('sa',th.dataset.key===S.sortKey);
+    const base=th.getAttribute('data-key');
+    const labels={name:'Name',company:'Company',bucket:'Bucket',tier:'Tier',last_contact:'Last Contact'};
+    th.textContent=(labels[base]||base)+(th.dataset.key===S.sortKey?(S.sortDir===1?' ↑':' ↓'):'');
+  });
+}
+
+function renderBucketBar(){
   const bar = document.getElementById('bucket-bar');
+  if(!bar) return;
   bar.innerHTML = '';
-  BUCKETS.forEach(b => {
+  BUCKETS.forEach(b=>{
+    const count = b==='All' ? S.people.length : S.people.filter(p=>p.bucket===b).length;
+    const color = BUCKET_COLORS[b]||'#60a5fa';
+    const active = S.activeBucket===b;
     const btn = document.createElement('button');
-    btn.className = 'bucket-tab' + (b === activeBucket ? ' active' : '');
-    btn.dataset.bucket = b;
-    const color = BUCKET_COLORS[b] || '#60a5fa';
-    if (b === activeBucket) {
-      btn.style.color = color;
-      btn.style.borderBottomColor = color;
-    }
-    const count = b === 'All' ? allContacts.length : allContacts.filter(c => c.bucket === b).length;
-    btn.innerHTML = `${b} <span class="tab-count">${count}</span>`;
-    btn.addEventListener('click', () => {
-      activeBucket = b;
-      selectedId = null;
-      closeDetailPane();
-      renderBucketBar();
-      applyFilters();
-    });
+    btn.className='btab'+(active?' active':'');
+    btn.style.color=active?color:'';
+    btn.style.borderBottomColor=active?color:'transparent';
+    btn.innerHTML=`${b} <span class="tc">${count}</span>`;
+    btn.addEventListener('click',()=>{ S.activeBucket=b; S.filterTag=null; renderPeople(); });
     bar.appendChild(btn);
   });
 }
 
-function updateTabCounts() {
-  document.querySelectorAll('.bucket-tab').forEach(btn => {
-    const b = btn.dataset.bucket;
-    const count = b === 'All' ? allContacts.length : allContacts.filter(c => c.bucket === b).length;
-    btn.querySelector('.tab-count').textContent = count;
-  });
-}
-
-function updateTotalCount() {
-  document.getElementById('total-count').textContent = `${allContacts.length} contact${allContacts.length !== 1 ? 's' : ''}`;
-}
-
-// ─── RENDER CONTACTS ───
-function renderContacts() {
-  const listView  = document.getElementById('list-view');
-  const cardsView = document.getElementById('cards-view');
-  const emptyEl   = document.getElementById('empty-state');
-
-  if (filteredList.length === 0) {
-    listView.style.display  = 'none';
-    cardsView.style.display = 'none';
-    emptyEl.classList.add('show');
-    return;
-  }
-  emptyEl.classList.remove('show');
-
-  if (currentView === 'list') {
-    listView.style.display  = 'table';
-    cardsView.style.display = 'none';
-    renderListView();
-  } else {
-    listView.style.display  = 'none';
-    cardsView.style.display = 'grid';
-    renderCardsView();
-  }
-}
-
-function renderListView() {
+function renderListView(list){
   const tbody = document.getElementById('list-body');
-  tbody.innerHTML = '';
-  filteredList.forEach(c => {
-    const ds = daysSince(c.last_contact);
-    const tr = document.createElement('tr');
-    if (c.id === selectedId) tr.classList.add('selected');
-    tr.innerHTML = `
-      <td>
-        <div class="contact-name-cell">
-          ${avatarHTML(c.name, 30)}
-          <div>
-            <div class="contact-name">${esc(c.name)}</div>
-            ${c.title ? `<div class="contact-title-small">${esc(c.title)}</div>` : ''}
-          </div>
-        </div>
-      </td>
-      <td style="color:var(--text3)">${esc(c.company||'—')}</td>
-      <td>${pillHTML(c.bucket)}</td>
-      <td class="${ds !== null && ds > 60 ? 'stale-red' : ''}" style="color:var(--text4);font-size:11px">
-        ${ds === null ? '—' : ds === 0 ? 'Today' : ds + 'd ago'}
-      </td>
-      <td><button class="edit-btn-small" data-id="${c.id}">✎</button></td>
+  tbody.innerHTML='';
+  list.forEach(p=>{
+    const ds  = daysSince(p.last_contact);
+    const tr  = document.createElement('tr');
+    if(p.id===S.detailId) tr.classList.add('sel');
+    tr.innerHTML=`
+      <td><div class="nc">${avatarHTML(p.name,30)}<div><div class="n-name">${esc(p.name)}</div>${p.role?`<div class="n-title">${esc(p.role)}</div>`:''}</div></div></td>
+      <td style="color:var(--t3);font-size:12px">${esc(p.company||'—')}</td>
+      <td>${pillHTML(p.bucket)}</td>
+      <td>${tierHTML(p.tier||'Warm')}</td>
+      <td style="font-size:11px;color:${ds!==null&&ds>30?'var(--red)':'var(--t4)'}">${ds===null?'—':ds===0?'Today':ds+'d ago'}</td>
+      <td><button class="vtbtn" data-edit="${p.id}" style="font-size:13px;color:var(--t4)">✎</button></td>
     `;
-    tr.addEventListener('click', (e) => {
-      if (e.target.closest('.edit-btn-small')) return;
-      selectContact(c.id === selectedId ? null : c.id);
-    });
-    tr.querySelector('.edit-btn-small').addEventListener('click', () => openModal(c));
+    tr.addEventListener('click',e=>{ if(e.target.closest('[data-edit]')) return; openContactDetail(p.id); });
+    tr.querySelector('[data-edit]').addEventListener('click',e=>{ e.stopPropagation(); openContactModal(p); });
     tbody.appendChild(tr);
   });
-
-  // Sort header highlight
-  document.querySelectorAll('#list-view thead th[data-key]').forEach(th => {
-    th.classList.toggle('sort-active', th.dataset.key === sortKey);
-    const arrow = th.dataset.key === sortKey ? (sortDir === 1 ? ' ↑' : ' ↓') : '';
-    th.textContent = th.textContent.replace(/ [↑↓]$/, '') + arrow;
-  });
 }
 
-function renderCardsView() {
+function renderCardsView(list){
   const grid = document.getElementById('cards-view');
-  grid.innerHTML = '';
-  filteredList.forEach(c => {
-    const ds = daysSince(c.last_contact);
-    const color = BUCKET_COLORS[c.bucket] || '#94a3b8';
-    const div = document.createElement('div');
-    div.className = 'card' + (c.id === selectedId ? ' selected' : '');
-    div.style.borderTopColor = color;
-    div.innerHTML = `
-      <div class="card-header">
-        <div style="display:flex;align-items:center;gap:9px">
-          ${avatarHTML(c.name, 34)}
-          <div class="card-info">
-            <div class="card-name">${esc(c.name)}</div>
-            <div class="card-sub">${esc(c.title || c.company || c.bucket)}</div>
-          </div>
+  grid.innerHTML='';
+  list.forEach(p=>{
+    const ds    = daysSince(p.last_contact);
+    const color = BUCKET_COLORS[p.bucket]||'#64748b';
+    const div   = document.createElement('div');
+    div.className='ccard'+(p.id===S.detailId?' sel':'');
+    div.style.borderTopColor=color;
+    div.innerHTML=`
+      <div class="cc-head">
+        <div style="display:flex;align-items:center;gap:10px">
+          ${avatarHTML(p.name,36)}
+          <div class="cc-info"><div class="cc-name">${esc(p.name)}</div><div class="cc-sub">${esc(p.role||p.company||p.bucket)}</div></div>
         </div>
-        <button class="edit-btn-small" data-id="${c.id}">✎</button>
+        <button data-edit="${p.id}" style="background:none;border:none;color:var(--t4);font-size:14px">✎</button>
       </div>
-      ${c.company ? `<div class="card-company">🏢 ${esc(c.company)}</div>` : ''}
-      ${c.email   ? `<div class="card-email">✉ ${esc(c.email)}</div>` : ''}
-      <div class="card-footer">
-        ${pillHTML(c.bucket)}
-        ${ds !== null ? `<span style="font-size:10px;color:${ds>60?'var(--red)':'var(--text5)'}">${ds}d ago</span>` : ''}
+      ${p.company?`<div class="cc-co">🏢 ${esc(p.company)}</div>`:''}
+      ${p.email?`<div class="cc-email">✉ ${esc(p.email)}</div>`:''}
+      <div class="cc-footer">
+        <div style="display:flex;gap:6px;align-items:center">${pillHTML(p.bucket)} ${tierHTML(p.tier||'Warm')}</div>
+        ${ds!==null?`<span style="font-size:10px;color:${ds>30?'var(--red)':'var(--t4)'}">${ds===0?'Today':ds+'d ago'}</span>`:''}
       </div>
-      ${(c.tags||[]).length > 0 ? `<div class="card-tags">${c.tags.map(t=>`<span class="card-tag">${esc(t)}</span>`).join('')}</div>` : ''}
+      ${(p.tags||[]).length?`<div class="cc-tags">${p.tags.map(t=>`<span class="cc-tag">${esc(t)}</span>`).join('')}</div>`:''}
     `;
-    div.addEventListener('click', (e) => {
-      if (e.target.closest('.edit-btn-small')) return;
-      selectContact(c.id === selectedId ? null : c.id);
-    });
-    div.querySelector('.edit-btn-small').addEventListener('click', () => openModal(c));
+    div.addEventListener('click',e=>{ if(e.target.closest('[data-edit]')) return; openContactDetail(p.id); });
+    div.querySelector('[data-edit]').addEventListener('click',e=>{ e.stopPropagation(); const full=S.people.find(x=>x.id===p.id); if(full) openContactModal(full); });
     grid.appendChild(div);
   });
 }
 
-// ─── DETAIL PANE ───
-function selectContact(id) {
-  selectedId = id;
-  renderContacts(); // re-render to update selected highlight
-  if (!id) { closeDetailPane(); return; }
-  const c = allContacts.find(x => x.id === id);
-  if (!c) { closeDetailPane(); return; }
-  renderDetailPane(c);
+// ── CONTACT DETAIL ────────────────────────────────────
+function openContactDetail(id){
+  S.detailId = id;
+  renderContactDetail(id);
+  navigate('contact');
 }
 
-function renderDetailPane(c) {
-  document.getElementById('detail-pane').classList.add('open');
-  document.getElementById('dp-avatar').innerHTML = avatarHTML(c.name, 46);
-  document.getElementById('dp-name').textContent = c.name;
-  document.getElementById('dp-sub').textContent  = [c.title, c.company].filter(Boolean).join(' · ') || c.bucket;
-  document.getElementById('dp-bucket').innerHTML = pillHTML(c.bucket);
-  document.getElementById('dp-stale').innerHTML  = staleHTML(daysSince(c.last_contact));
+function renderContactDetail(id){
+  const p = S.people.find(x=>x.id===id);
+  if(!p){ navigate('people'); return; }
 
-  let fields = '';
-  if (c.email)    fields += dpRow('Email', `<a href="mailto:${esc(c.email)}" style="color:#60a5fa;text-decoration:none">${esc(c.email)}</a>`);
-  if (c.phone)    fields += dpRow('Phone', `<a href="tel:${esc(c.phone)}" style="color:#60a5fa;text-decoration:none">${esc(c.phone)}</a>`);
-  if (c.linkedin) fields += dpRow('LinkedIn', `<a href="${esc(c.linkedin)}" target="_blank" style="color:#60a5fa;text-decoration:none">${esc(c.linkedin)}</a>`);
-  if (c.last_contact) fields += dpRow('Date', c.last_contact);
-  if ((c.tags||[]).length > 0) {
-    fields += `<div class="dp-row"><div class="dp-row-label">Tags</div><div class="dp-tags">${c.tags.map(t=>`<span class="dp-tag">${esc(t)}</span>`).join('')}</div></div>`;
-  }
-  if (c.notes)    fields += dpRow('Notes', esc(c.notes).replace(/\n/g,'<br>'));
-  document.getElementById('dp-fields').innerHTML = fields;
+  const pers = S.reminders.filter(r=>r.person_id===id);
+  const openRems = pers.filter(r=>!r.completed);
+  const docs = Array.isArray(p.documents) ? p.documents : [];
 
-  document.getElementById('dp-edit-btn').onclick = () => openModal(c);
+  const field = (label, val, link) => {
+    if(!val&&val!==0) return '';
+    const v = link ? `<a href="${esc(val)}" target="_blank" rel="noopener">${esc(val)}</a>` : esc(val);
+    return `<div class="cd-field"><div class="cd-fl">${label}</div><div class="cd-fv">${v}</div></div>`;
+  };
+  const handleField = (label, handle) => {
+    if(!handle) return '';
+    const h = handle.startsWith('@') ? handle : '@'+handle;
+    return `<div class="cd-field"><div class="cd-fl">${label}</div><div class="cd-fv" style="color:var(--blue)">${esc(h)}</div></div>`;
+  };
+
+  const wrap = document.getElementById('cd-inner');
+  wrap.innerHTML = `
+    <button class="cd-back" id="cd-back-btn">← Back</button>
+    <div class="cd-hero">
+      ${avatarHTML(p.name,64)}
+      <div class="cd-hero-info">
+        <div class="cd-name">${esc(p.name)}</div>
+        <div class="cd-meta">${[p.role, p.company, p.manager?'Reports to: '+p.manager:''].filter(Boolean).join(' · ')}</div>
+        <div class="cd-pills">
+          ${pillHTML(p.bucket)} ${tierHTML(p.tier||'Warm')}
+          ${(p.tags||[]).map(t=>`<span class="cc-tag" style="font-size:11px">${esc(t)}</span>`).join('')}
+        </div>
+        <div class="cd-actions">
+          <button class="cd-btn primary" id="cd-followup">📞 Log Follow-Up</button>
+          <button class="cd-btn" id="cd-edit">✎ Edit</button>
+          <button class="cd-btn danger" id="cd-del">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="cd-sections">
+      <div class="cd-section">
+        <div class="cd-sec-title">Contact Info</div>
+        ${field('Email', p.email, false) || '<div class="cd-field"><div class="cd-fl">Email</div><div class="cd-fv" style="color:var(--t4)">—</div></div>'}
+        ${field('Phone', p.phone)}
+        ${field('Address', p.address)}
+      </div>
+
+      <div class="cd-section">
+        <div class="cd-sec-title">Professional</div>
+        ${field('Company', p.company)}
+        ${field('Role', p.role)}
+        ${field('Manager', p.manager)}
+        ${field('Birthday', p.birthday ? formatDate(p.birthday)+(nextBirthday(p.birthday)!==null?' ('+nextBirthday(p.birthday)+'d away)':'') : null)}
+        ${field('Last Contact', p.last_contact ? formatDate(p.last_contact) : null)}
+      </div>
+
+      ${p.linkedin||p.twitter||p.instagram||p.tiktok||p.youtube||p.follower_count ? `
+      <div class="cd-section">
+        <div class="cd-sec-title">Social</div>
+        ${field('LinkedIn', p.linkedin, true)}
+        ${handleField('Twitter', p.twitter)}
+        ${handleField('Instagram', p.instagram)}
+        ${handleField('TikTok', p.tiktok)}
+        ${field('YouTube', p.youtube, true)}
+        ${p.follower_count ? `<div class="cd-field"><div class="cd-fl">Followers</div><div class="cd-fv">${fmtFollowers(p.follower_count)}</div></div>` : ''}
+      </div>` : ''}
+
+      <div class="cd-section">
+        <div class="cd-sec-title">Reminders (${openRems.length} open)</div>
+        ${openRems.length===0 ? '<div style="font-size:12px;color:var(--t4)">No open reminders</div>' :
+          openRems.map(r=>{
+            const rt=REM_TYPES[r.type]||REM_TYPES.follow_up;
+            const ds2=r.due_date?daysSince(r.due_date):null;
+            return `<div class="rem-item">
+              <input type="checkbox" class="rem-check" data-rem="${r.id}"/>
+              <div style="flex:1">
+                <div class="rem-title">${rt.emoji} ${esc(r.title)}</div>
+                ${r.notes?`<div style="font-size:11px;color:var(--t3)">${esc(r.notes)}</div>`:''}
+              </div>
+              <div class="rem-due ${ds2!==null&&ds2>0?'overdue':''}">${r.due_date?formatDate(r.due_date):''}</div>
+            </div>`;
+          }).join('')
+        }
+        <button class="add-inline-btn" id="cd-add-rem">+ Add Reminder</button>
+      </div>
+
+      ${p.goals ? `
+      <div class="cd-section">
+        <div class="cd-sec-title">Goals</div>
+        <div style="font-size:13px;color:var(--t2);line-height:1.7;white-space:pre-wrap">${esc(p.goals)}</div>
+      </div>` : ''}
+
+      <div class="cd-section full">
+        <div class="cd-sec-title" style="display:flex;justify-content:space-between;align-items:center">
+          Notes
+          <button class="add-inline-btn" id="cd-fullnotes" style="margin-top:0">⛶ Full screen</button>
+        </div>
+        ${p.notes
+          ? `<div class="notes-preview">${esc(p.notes)}</div>`
+          : `<div style="font-size:12px;color:var(--t4)">No notes yet</div>`}
+      </div>
+
+      ${docs.length>0||true ? `
+      <div class="cd-section full">
+        <div class="cd-sec-title">Documents & Links</div>
+        ${docs.length===0 ? '<div style="font-size:12px;color:var(--t4)">No documents attached</div>' :
+          docs.map((d,i)=>`<div class="doc-item">
+            <span class="doc-icon">📎</span>
+            <span class="doc-name">${esc(d.name)}</span>
+            <a href="${esc(d.url)}" target="_blank" rel="noopener" class="doc-link">Open ↗</a>
+            <button style="background:none;border:none;color:var(--t4);cursor:pointer;font-size:13px" data-doc-del="${i}">✕</button>
+          </div>`).join('')
+        }
+        <button class="add-inline-btn" id="cd-add-doc">+ Attach Link</button>
+      </div>` : ''}
+    </div>
+  `;
+
+  // Contact detail events
+  document.getElementById('cd-back-btn').addEventListener('click', ()=>navigate(S.prevView||'people'));
+  document.getElementById('cd-edit').addEventListener('click', ()=>openContactModal(p));
+  document.getElementById('cd-del').addEventListener('click', ()=>deletePerson(p.id));
+  document.getElementById('cd-followup').addEventListener('click', ()=>openRemModal(p.id, p.name));
+  document.getElementById('cd-fullnotes').addEventListener('click', ()=>openFullNotes(p));
+
+  const addRemBtn = document.getElementById('cd-add-rem');
+  if(addRemBtn) addRemBtn.addEventListener('click', ()=>openRemModal(p.id, p.name));
+
+  const addDocBtn = document.getElementById('cd-add-doc');
+  if(addDocBtn) addDocBtn.addEventListener('click', ()=>openAddDocInline(p));
+
+  wrap.querySelectorAll('.rem-check').forEach(cb=>{
+    cb.addEventListener('change', ()=>toggleReminder(cb.dataset.rem, cb.checked));
+  });
+  wrap.querySelectorAll('[data-doc-del]').forEach(btn=>{
+    btn.addEventListener('click', async ()=>{
+      const idx = parseInt(btn.dataset.docDel);
+      const newDocs = [...docs];
+      newDocs.splice(idx, 1);
+      await db.from('people').update({documents:newDocs}).eq('id',p.id);
+      const person = S.people.find(x=>x.id===p.id);
+      if(person) person.documents = newDocs;
+      renderContactDetail(p.id);
+    });
+  });
 }
 
-function dpRow(label, val) {
-  return `<div class="dp-row"><div class="dp-row-label">${label}</div><div class="dp-row-val">${val}</div></div>`;
+// ── FULL-SCREEN NOTES ─────────────────────────────────
+function openFullNotes(p){
+  S.notesPersonId = p.id;
+  document.getElementById('notes-for-name').textContent = p.name + ' — Notes';
+  document.getElementById('notes-textarea').value = p.notes||'';
+  navigate('notes');
 }
 
-function closeDetailPane() {
-  selectedId = null;
-  document.getElementById('detail-pane').classList.remove('open');
+// ── ADD DOC INLINE ────────────────────────────────────
+async function openAddDocInline(p){
+  const name = prompt('Document name:');
+  if(!name) return;
+  const url = prompt('URL / Link:');
+  if(!url) return;
+  const docs = Array.isArray(p.documents) ? [...p.documents] : [];
+  docs.push({name, url, added:today()});
+  await db.from('people').update({documents:docs}).eq('id',p.id);
+  const person = S.people.find(x=>x.id===p.id);
+  if(person) person.documents = docs;
+  toast('✓ Document attached');
+  renderContactDetail(p.id);
 }
 
-// ─── MODAL ───
-function openModal(contact = null) {
-  editingId = contact ? contact.id : null;
-  formTags  = contact ? [...(contact.tags || [])] : [];
+// ── REMINDERS VIEW ────────────────────────────────────
+function renderReminders(){
+  const wrap = document.getElementById('rem-inner');
+  if(!wrap) return;
 
-  document.getElementById('f-name').value         = contact?.name         || '';
-  document.getElementById('f-company').value      = contact?.company      || '';
-  document.getElementById('f-title').value        = contact?.title        || '';
-  document.getElementById('f-email').value        = contact?.email        || '';
-  document.getElementById('f-phone').value        = contact?.phone        || '';
-  document.getElementById('f-linkedin').value     = contact?.linkedin     || '';
-  document.getElementById('f-bucket').value       = contact?.bucket       || 'Prospects';
-  document.getElementById('f-last-contact').value = contact?.last_contact || today();
-  document.getElementById('f-notes').value        = contact?.notes        || '';
+  const overdue  = S.reminders.filter(r=>!r.completed&&r.due_date&&r.due_date<today());
+  const dueToday = S.reminders.filter(r=>!r.completed&&r.due_date===today());
+  const upcoming = S.reminders.filter(r=>!r.completed&&r.due_date&&r.due_date>today());
+  const done     = S.reminders.filter(r=>r.completed);
 
-  document.getElementById('modal-title').textContent = contact ? contact.name : 'New Contact';
-  document.getElementById('modal-sub').textContent   = contact ? 'Edit contact' : 'Add to ORBIT';
-  document.getElementById('modal-avatar').innerHTML  = avatarHTML(contact?.name || '?', 38);
-  document.getElementById('btn-delete').style.display = contact ? 'inline-block' : 'none';
-  document.getElementById('btn-save').textContent    = contact ? 'Save Changes' : 'Add Contact';
+  const remCard = r => {
+    const rt=REM_TYPES[r.type]||REM_TYPES.follow_up;
+    const ds2=r.due_date?daysSince(r.due_date):null;
+    return `<div class="rem-card ${r.completed?'done':''}" data-rem="${r.id}">
+      <input type="checkbox" class="rc-check" ${r.completed?'checked':''} data-rem="${r.id}"/>
+      <div class="rc-info">
+        <div class="rc-title">${rt.emoji} ${esc(r.title)}
+          <span class="rem-type-badge" style="background:${rt.color}20;color:${rt.color};margin-left:6px">${rt.label}</span>
+        </div>
+        ${r.person_name?`<div class="rc-person" data-pid="${r.person_id||''}">${esc(r.person_name)}</div>`:''}
+        ${r.notes?`<div class="rc-notes">${esc(r.notes)}</div>`:''}
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+        <div class="rc-due ${ds2!==null&&ds2>0?'overdue':''}">${r.due_date?formatDate(r.due_date):'No date'}</div>
+        <button class="rem-del" data-del="${r.id}">✕</button>
+      </div>
+    </div>`;
+  };
 
+  const group = (title, items) => {
+    if(!items.length) return '';
+    return `<div class="rem-group">
+      <div class="rem-group-title">${title}</div>
+      ${items.map(remCard).join('')}
+    </div>`;
+  };
+
+  wrap.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <h2>Reminders</h2>
+      <button class="btn-primary" id="rem-add-btn">+ Add Reminder</button>
+    </div>
+    ${!overdue.length&&!dueToday.length&&!upcoming.length&&!done.length
+      ? '<div class="empty"><div class="ei">◷</div><div class="et">No reminders yet</div></div>'
+      : group('🔴 Overdue', overdue)
+        + group('🟡 Today', dueToday)
+        + group('🔵 Upcoming', upcoming)
+        + group('✓ Completed', done.slice(0,10))}
+  `;
+
+  wrap.querySelectorAll('.rc-check').forEach(cb=>{
+    cb.addEventListener('change', ()=>toggleReminder(cb.dataset.rem, cb.checked));
+  });
+  wrap.querySelectorAll('[data-del]').forEach(btn=>{
+    btn.addEventListener('click', ()=>deleteReminder(btn.dataset.del));
+  });
+  wrap.querySelectorAll('[data-pid]').forEach(el=>{
+    if(el.dataset.pid) el.addEventListener('click', ()=>openContactDetail(el.dataset.pid));
+  });
+  const addBtn = document.getElementById('rem-add-btn');
+  if(addBtn) addBtn.addEventListener('click', ()=>openRemModal(null,null));
+}
+
+// ── TAGS VIEW ─────────────────────────────────────────
+function renderTags(){
+  const wrap = document.getElementById('tags-inner');
+  if(!wrap) return;
+
+  // Collect all tags
+  const tagMap = {};
+  S.people.forEach(p=>{
+    (p.tags||[]).forEach(t=>{
+      tagMap[t] = (tagMap[t]||0)+1;
+    });
+  });
+  const tags = Object.entries(tagMap).sort((a,b)=>b[1]-a[1]);
+
+  wrap.innerHTML = `
+    <h2>Tags</h2>
+    <p style="color:var(--t3);font-size:13px;margin-bottom:20px">${tags.length} unique tags across ${S.people.length} people</p>
+    ${tags.length===0
+      ? '<div class="empty"><div class="ei">◈</div><div class="et">No tags yet — add them when editing a contact</div></div>'
+      : `<div class="tags-grid">
+          ${tags.map(([tag,count])=>`
+            <div class="tag-chip" data-tag="${esc(tag)}">
+              <span class="tc-name">${esc(tag)}</span>
+              <span class="tc-count">${count}</span>
+            </div>
+          `).join('')}
+        </div>`
+    }
+  `;
+
+  wrap.querySelectorAll('[data-tag]').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      S.filterTag = chip.dataset.tag;
+      S.activeBucket = 'All';
+      navigate('people');
+    });
+  });
+}
+
+// ── UPDATE BADGE ──────────────────────────────────────
+function updateBadge(){
+  const due = S.reminders.filter(r=>!r.completed&&r.due_date&&r.due_date<=today()).length;
+  const badge = document.getElementById('nav-badge');
+  const dot   = document.getElementById('notif-dot');
+  if(badge){ badge.textContent=due; badge.style.display=due>0?'inline-block':'none'; }
+  if(dot) dot.style.display=due>0?'block':'none';
+}
+
+// ── CONTACT MODAL ─────────────────────────────────────
+function populateBucketSelect(){
+  const sel = document.getElementById('m-bucket');
+  if(!sel||sel.children.length>0) return;
+  BUCKETS.filter(b=>b!=='All').forEach(b=>{
+    const o=document.createElement('option');
+    o.value=b; o.textContent=b;
+    sel.appendChild(o);
+  });
+}
+
+function openContactModal(p=null){
+  S.editId   = p ? p.id : null;
+  S.formTags = p ? [...(p.tags||[])] : [];
+  S.formDocs = p ? (Array.isArray(p.documents)?[...p.documents]:[]) : [];
+
+  populateBucketSelect();
+
+  document.getElementById('cm-title').textContent = p ? 'Edit: '+p.name : 'Add Person';
+  document.getElementById('m-name').value         = p?.name||'';
+  document.getElementById('m-company').value      = p?.company||'';
+  document.getElementById('m-role').value         = p?.role||'';
+  document.getElementById('m-manager').value      = p?.manager||'';
+  document.getElementById('m-birthday').value     = p?.birthday||'';
+  document.getElementById('m-last-contact').value = p?.last_contact||today();
+  document.getElementById('m-bucket').value       = p?.bucket||'Prospects';
+  document.getElementById('m-tier').value         = p?.tier||'Warm';
+  document.getElementById('m-email').value        = p?.email||'';
+  document.getElementById('m-phone').value        = p?.phone||'';
+  document.getElementById('m-address').value      = p?.address||'';
+  document.getElementById('m-linkedin').value     = p?.linkedin||'';
+  document.getElementById('m-twitter').value      = p?.twitter||'';
+  document.getElementById('m-instagram').value    = p?.instagram||'';
+  document.getElementById('m-tiktok').value       = p?.tiktok||'';
+  document.getElementById('m-youtube').value      = p?.youtube||'';
+  document.getElementById('m-followers').value    = p?.follower_count||'';
+  document.getElementById('m-goals').value        = p?.goals||'';
+  document.getElementById('m-notes').value        = p?.notes||'';
+
+  document.getElementById('cm-delete').style.display = p ? 'inline-block' : 'none';
+  document.getElementById('cm-save').textContent = p ? 'Save Changes' : 'Add Person';
+
+  // Reset to first tab
+  switchFormTab('profile');
   renderTagPills();
-  document.getElementById('modal-overlay').classList.add('open');
-  setTimeout(() => document.getElementById('f-name').focus(), 60);
+  renderDocsList();
+
+  document.getElementById('contact-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('m-name').focus(),80);
 }
 
-function closeModal() {
-  document.getElementById('modal-overlay').classList.remove('open');
-  editingId = null;
-  formTags  = [];
+function closeContactModal(){
+  document.getElementById('contact-modal').classList.remove('open');
+  S.editId=null; S.formTags=[]; S.formDocs=[];
 }
 
-function renderTagPills() {
-  const wrap = document.getElementById('tag-wrap');
-  const inp  = document.getElementById('tag-input-field');
-  wrap.innerHTML = '';
-  formTags.forEach(t => {
-    const span = document.createElement('span');
-    span.className = 'tag-pill';
-    span.innerHTML = `${esc(t)} <button class="tag-remove" data-tag="${esc(t)}">×</button>`;
-    span.querySelector('.tag-remove').addEventListener('click', () => {
-      formTags = formTags.filter(x => x !== t);
+function switchFormTab(tab){
+  document.querySelectorAll('.ftab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+  document.querySelectorAll('.ftab-pane').forEach(p=>p.classList.toggle('active',p.id==='tab-'+tab));
+}
+
+function renderTagPills(){
+  const wrap = document.getElementById('m-tag-wrap');
+  const fi   = document.getElementById('m-tag-fi');
+  if(!wrap||!fi) return;
+  // Remove existing pills
+  wrap.querySelectorAll('.tpill').forEach(el=>el.remove());
+  S.formTags.forEach(t=>{
+    const span=document.createElement('span');
+    span.className='tpill';
+    span.innerHTML=`${esc(t)}<button class="tpill-x" data-tag="${esc(t)}">×</button>`;
+    span.querySelector('.tpill-x').addEventListener('click',()=>{
+      S.formTags=S.formTags.filter(x=>x!==t);
       renderTagPills();
     });
-    wrap.appendChild(span);
+    wrap.insertBefore(span,fi);
   });
-  wrap.appendChild(inp);
-  inp.focus();
 }
 
-function buildPayload() {
+function addTag(raw){
+  const t = raw.trim().replace(/^#/,'');
+  if(t&&!S.formTags.includes(t)){ S.formTags.push(t); renderTagPills(); }
+}
+
+function renderDocsList(){
+  const wrap = document.getElementById('m-docs-list');
+  if(!wrap) return;
+  if(!S.formDocs.length){ wrap.innerHTML='<div style="font-size:12px;color:var(--t4);margin-bottom:8px">No documents yet</div>'; return; }
+  wrap.innerHTML = S.formDocs.map((d,i)=>`
+    <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--b1)">
+      <span>📎</span>
+      <span style="flex:1;font-size:13px">${esc(d.name)}</span>
+      <a href="${esc(d.url)}" target="_blank" style="font-size:11px">↗</a>
+      <button data-di="${i}" style="background:none;border:none;color:var(--t4);cursor:pointer">✕</button>
+    </div>
+  `).join('');
+  wrap.querySelectorAll('[data-di]').forEach(btn=>{
+    btn.addEventListener('click',()=>{ S.formDocs.splice(parseInt(btn.dataset.di),1); renderDocsList(); });
+  });
+}
+
+function buildPersonPayload(){
   return {
-    name:         document.getElementById('f-name').value.trim(),
-    company:      document.getElementById('f-company').value.trim() || null,
-    title:        document.getElementById('f-title').value.trim()   || null,
-    email:        document.getElementById('f-email').value.trim()   || null,
-    phone:        document.getElementById('f-phone').value.trim()   || null,
-    linkedin:     document.getElementById('f-linkedin').value.trim()|| null,
-    bucket:       document.getElementById('f-bucket').value,
-    last_contact: document.getElementById('f-last-contact').value   || null,
-    notes:        document.getElementById('f-notes').value.trim()   || null,
-    tags:         formTags,
+    name:          document.getElementById('m-name').value.trim(),
+    company:       document.getElementById('m-company').value.trim()||null,
+    role:          document.getElementById('m-role').value.trim()||null,
+    manager:       document.getElementById('m-manager').value.trim()||null,
+    birthday:      document.getElementById('m-birthday').value||null,
+    last_contact:  document.getElementById('m-last-contact').value||null,
+    bucket:        document.getElementById('m-bucket').value,
+    tier:          document.getElementById('m-tier').value,
+    email:         document.getElementById('m-email').value.trim()||null,
+    phone:         document.getElementById('m-phone').value.trim()||null,
+    address:       document.getElementById('m-address').value.trim()||null,
+    linkedin:      document.getElementById('m-linkedin').value.trim()||null,
+    twitter:       document.getElementById('m-twitter').value.trim()||null,
+    instagram:     document.getElementById('m-instagram').value.trim()||null,
+    tiktok:        document.getElementById('m-tiktok').value.trim()||null,
+    youtube:       document.getElementById('m-youtube').value.trim()||null,
+    follower_count:parseInt(document.getElementById('m-followers').value)||0,
+    goals:         document.getElementById('m-goals').value.trim()||null,
+    notes:         document.getElementById('m-notes').value.trim()||null,
+    tags:          S.formTags,
+    documents:     S.formDocs,
   };
 }
 
-// ─── ESCAPE ───
-function esc(str) {
-  return String(str||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+// ── REMINDER MODAL ────────────────────────────────────
+function openRemModal(personId, personName){
+  S.remEditId = null;
+  document.getElementById('rm-title').textContent   = 'Add Reminder';
+  document.getElementById('r-title').value          = personName ? 'Follow up with '+personName : '';
+  document.getElementById('r-type').value           = 'follow_up';
+  document.getElementById('r-due').value            = today();
+  document.getElementById('r-notes').value          = '';
+  document.getElementById('r-person-id').value      = personId||'';
+  document.getElementById('r-person-name').value    = personName||'';
+  document.getElementById('rem-modal').classList.add('open');
+  setTimeout(()=>document.getElementById('r-title').focus(),80);
 }
 
-// ─── POPULATE SELECTS ───
-function populateBucketSelect() {
-  const sel = document.getElementById('f-bucket');
-  BUCKETS.filter(b => b !== 'All').forEach(b => {
-    const opt = document.createElement('option');
-    opt.value = b; opt.textContent = b;
-    sel.appendChild(opt);
+function closeRemModal(){
+  document.getElementById('rem-modal').classList.remove('open');
+  S.remEditId=null;
+}
+
+function buildRemPayload(){
+  return {
+    title:       document.getElementById('r-title').value.trim(),
+    type:        document.getElementById('r-type').value,
+    due_date:    document.getElementById('r-due').value||null,
+    notes:       document.getElementById('r-notes').value.trim()||null,
+    person_id:   document.getElementById('r-person-id').value||null,
+    person_name: document.getElementById('r-person-name').value||null,
+    completed:   false,
+  };
+}
+
+// ── SIDEBAR ───────────────────────────────────────────
+function openSidebar(){
+  document.getElementById('sidebar').classList.add('open');
+  document.getElementById('sidebar-overlay').style.display='block';
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebar-overlay').style.display='none';
+}
+
+// ── SHOW APP / AUTH ───────────────────────────────────
+function showApp(user){
+  S.user = user;
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app').style.display='block';
+  // Set user info in sidebar
+  const email = user.email||'';
+  const ini   = email.split('@')[0].slice(0,2).toUpperCase();
+  document.getElementById('sb-avatar').textContent = ini;
+  document.getElementById('sb-email').textContent  = email;
+  loadAll().then(()=>{
+    renderDashboard();
+    updateBadge();
   });
 }
 
-// ─── EVENT LISTENERS ───
-document.getElementById('btn-add').addEventListener('click', () => openModal());
+function showAuth(){
+  document.getElementById('auth-screen').style.display='flex';
+  document.getElementById('app').style.display='none';
+  S.user=null;
+}
 
-document.getElementById('search-input').addEventListener('input', (e) => {
-  searchQuery = e.target.value;
-  selectedId  = null;
-  closeDetailPane();
-  applyFilters();
-});
+// ── EVENTS ────────────────────────────────────────────
+function setupEvents(){
 
-document.querySelectorAll('.view-btn').forEach(btn => {
-  btn.addEventListener('click', () => {
-    currentView = btn.dataset.view;
-    document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    renderContacts();
+  // AUTH
+  let authMode = 'in';
+  document.getElementById('auth-submit').addEventListener('click', ()=>doAuth(authMode));
+  document.getElementById('auth-email').addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('auth-password').focus(); });
+  document.getElementById('auth-password').addEventListener('keydown', e=>{ if(e.key==='Enter') doAuth(authMode); });
+  document.getElementById('auth-toggle-link').addEventListener('click', ()=>{
+    authMode = authMode==='in' ? 'up' : 'in';
+    const isUp = authMode==='up';
+    document.getElementById('auth-title').textContent = isUp ? 'Create Account' : 'Sign In';
+    document.getElementById('auth-sub').textContent   = isUp ? 'Set up your ORBIT account' : 'Access your personal CRM';
+    document.getElementById('auth-submit').textContent = isUp ? 'Create Account' : 'Sign In';
+    document.getElementById('auth-toggle-link').textContent = isUp ? 'Have an account? Sign in' : 'Need an account? Create one';
+    document.getElementById('auth-note').style.display = isUp ? 'block' : 'none';
+    document.getElementById('auth-error').style.display='none';
   });
-});
 
-document.getElementById('sort-select').addEventListener('change', (e) => {
-  sortKey = e.target.value;
-  applyFilters();
-});
+  // SIGN OUT
+  document.getElementById('btn-signout').addEventListener('click', async ()=>{
+    await db.auth.signOut(); showAuth();
+  });
 
-// Column header sort click
-document.getElementById('list-view').addEventListener('click', (e) => {
-  const th = e.target.closest('th[data-key]');
-  if (!th) return;
-  const key = th.dataset.key;
-  if (sortKey === key) { sortDir *= -1; } else { sortKey = key; sortDir = 1; }
-  document.getElementById('sort-select').value = key;
-  applyFilters();
-});
+  // SIDEBAR NAV
+  document.querySelectorAll('.nav-item[data-nav]').forEach(btn=>{
+    btn.addEventListener('click', ()=>navigate(btn.dataset.nav));
+  });
 
-// Detail pane close
-document.getElementById('dp-close').addEventListener('click', () => {
-  selectedId = null;
-  closeDetailPane();
-  renderContacts();
-});
+  // HAMBURGER
+  document.getElementById('hamburger').addEventListener('click', ()=>{
+    if(document.getElementById('sidebar').classList.contains('open')) closeSidebar();
+    else openSidebar();
+  });
+  document.getElementById('sidebar-overlay').addEventListener('click', closeSidebar);
 
-// Modal close
-document.getElementById('modal-close').addEventListener('click', closeModal);
-document.getElementById('btn-cancel').addEventListener('click', closeModal);
-document.getElementById('modal-overlay').addEventListener('click', (e) => {
-  if (e.target === document.getElementById('modal-overlay')) closeModal();
-});
+  // SEARCH
+  document.getElementById('top-search').addEventListener('input', e=>{
+    S.search = e.target.value;
+    if(S.view==='people') renderPeople();
+    else navigate('people');
+  });
 
-// Modal save
-document.getElementById('btn-save').addEventListener('click', () => {
-  const p = buildPayload();
-  if (!p.name) { document.getElementById('f-name').focus(); return; }
-  saveContact(p);
-});
+  // ADD BUTTONS
+  document.getElementById('btn-add-contact').addEventListener('click', ()=>openContactModal());
+  document.getElementById('bb-add-contact').addEventListener('click', ()=>openContactModal());
+  document.getElementById('bb-add-rem').addEventListener('click', ()=>openRemModal(null,null));
 
-// Delete
-document.getElementById('btn-delete').addEventListener('click', () => {
-  if (editingId) deleteContact(editingId);
-});
+  // SORT
+  document.getElementById('sort-sel').addEventListener('change', e=>{
+    S.sortKey=e.target.value; renderPeople();
+  });
 
-// Tag input
-document.getElementById('tag-input-field').addEventListener('keydown', (e) => {
-  const val = e.target.value.trim().replace(/,$/, '');
-  if ((e.key === 'Enter' || e.key === ',') && val) {
-    e.preventDefault();
-    if (!formTags.includes(val)) { formTags.push(val); renderTagPills(); }
-    else e.target.value = '';
-  } else if (e.key === 'Backspace' && !e.target.value && formTags.length) {
-    formTags.pop(); renderTagPills();
+  // VIEW TOGGLE
+  document.querySelectorAll('.vtbtn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      S.vm=btn.dataset.vm;
+      document.querySelectorAll('.vtbtn').forEach(b=>b.classList.toggle('active',b.dataset.vm===S.vm));
+      renderPeople();
+    });
+  });
+
+  // LIST HEADER SORT
+  document.getElementById('list-view').addEventListener('click', e=>{
+    const th=e.target.closest('th[data-key]');
+    if(!th) return;
+    if(S.sortKey===th.dataset.key) S.sortDir*=-1;
+    else{ S.sortKey=th.dataset.key; S.sortDir=1; }
+    document.getElementById('sort-sel').value=S.sortKey;
+    renderPeople();
+  });
+
+  // CONTACT MODAL EVENTS
+  document.getElementById('cm-close').addEventListener('click', closeContactModal);
+  document.getElementById('cm-cancel').addEventListener('click', closeContactModal);
+  document.getElementById('contact-modal').addEventListener('click', e=>{
+    if(e.target===document.getElementById('contact-modal')) closeContactModal();
+  });
+  document.getElementById('cm-save').addEventListener('click', ()=>{
+    const p=buildPersonPayload();
+    if(!p.name){ document.getElementById('m-name').focus(); toast('Name is required'); return; }
+    savePerson(p);
+  });
+  document.getElementById('cm-delete').addEventListener('click', ()=>{
+    if(S.editId) deletePerson(S.editId);
+  });
+
+  // FORM TABS
+  document.querySelectorAll('.ftab').forEach(btn=>{
+    btn.addEventListener('click', ()=>switchFormTab(btn.dataset.tab));
+  });
+
+  // TAG INPUT
+  document.getElementById('m-tag-fi').addEventListener('keydown', e=>{
+    const v=e.target.value;
+    if((e.key==='Enter'||e.key===','||e.key===' ')&&v.trim()){
+      e.preventDefault();
+      addTag(v);
+      e.target.value='';
+    } else if(e.key==='Backspace'&&!v&&S.formTags.length){
+      S.formTags.pop(); renderTagPills();
+    }
+  });
+  document.getElementById('m-tag-fi').addEventListener('input', e=>{
+    if(e.target.value.endsWith(',')||e.target.value.endsWith(' ')){
+      const t=e.target.value.replace(/[, ]+$/,'').trim();
+      if(t){ addTag(t); e.target.value=''; }
+    }
+  });
+
+  // DOC ADD
+  document.getElementById('doc-add-btn').addEventListener('click', ()=>{
+    const name=document.getElementById('doc-name-fi').value.trim();
+    const url =document.getElementById('doc-url-fi').value.trim();
+    if(!name||!url){ toast('Name and URL required'); return; }
+    S.formDocs.push({name,url,added:today()});
+    document.getElementById('doc-name-fi').value='';
+    document.getElementById('doc-url-fi').value='';
+    renderDocsList();
+  });
+
+  // REMINDER MODAL
+  document.getElementById('rm-close').addEventListener('click', closeRemModal);
+  document.getElementById('rm-cancel').addEventListener('click', closeRemModal);
+  document.getElementById('rem-modal').addEventListener('click', e=>{
+    if(e.target===document.getElementById('rem-modal')) closeRemModal();
+  });
+  document.getElementById('rm-save').addEventListener('click', ()=>{
+    const p=buildRemPayload();
+    if(!p.title){ document.getElementById('r-title').focus(); toast('Title required'); return; }
+    saveReminder(p);
+  });
+
+  // NOTES FULL SCREEN
+  document.getElementById('notes-back').addEventListener('click', ()=>{
+    navigate(S.prevView||'contact');
+  });
+  document.getElementById('notes-save-btn').addEventListener('click', async ()=>{
+    if(!S.notesPersonId) return;
+    const notes=document.getElementById('notes-textarea').value;
+    await saveNotesForPerson(S.notesPersonId, notes);
+  });
+  // Auto-save on blur
+  document.getElementById('notes-textarea').addEventListener('blur', async ()=>{
+    if(!S.notesPersonId) return;
+    await saveNotesForPerson(S.notesPersonId, document.getElementById('notes-textarea').value);
+  });
+
+  // ESC to close modals
+  document.addEventListener('keydown', e=>{
+    if(e.key==='Escape'){
+      closeContactModal();
+      closeRemModal();
+    }
+  });
+}
+
+// ── INIT ──────────────────────────────────────────────
+async function init(){
+  setupEvents();
+
+  // Auth state listener
+  db.auth.onAuthStateChange((event, session)=>{
+    if(event==='SIGNED_IN'&&session?.user){
+      if(isAllowed(session.user.email)) showApp(session.user);
+      else { db.auth.signOut(); showAuth(); }
+    } else if(event==='SIGNED_OUT'){
+      showAuth();
+    }
+  });
+
+  // Check existing session
+  try{
+    const {data:{session}} = await db.auth.getSession();
+    if(session?.user&&isAllowed(session.user.email)){
+      showApp(session.user);
+    } else {
+      showAuth();
+    }
+  }catch(e){
+    console.error('Session check failed:',e);
+    showAuth();
   }
-});
-document.getElementById('tag-input-field').addEventListener('input', (e) => {
-  if (e.target.value.endsWith(',')) {
-    const val = e.target.value.slice(0,-1).trim();
-    if (val && !formTags.includes(val)) { formTags.push(val); renderTagPills(); }
-    else e.target.value = '';
-  }
-});
+}
 
-// Update avatar preview on name input
-document.getElementById('f-name').addEventListener('input', (e) => {
-  document.getElementById('modal-avatar').innerHTML = avatarHTML(e.target.value || '?', 38);
-  if (editingId) document.getElementById('modal-title').textContent = e.target.value || 'Edit Contact';
-});
-
-// ─── INIT ───
-populateBucketSelect();
-renderBucketBar();
-fetchContacts();
+document.addEventListener('DOMContentLoaded', init);
 </script>
-
 </body>
 </html>
